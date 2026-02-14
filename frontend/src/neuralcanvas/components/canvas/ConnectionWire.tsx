@@ -20,6 +20,7 @@ import {
   type Dim,
 } from "@/neuralcanvas/lib/shapeEngine";
 import { BLOCK_REGISTRY, type BlockType } from "@/neuralcanvas/lib/blockRegistry";
+import { CANVAS_UI_SCALE, SHAPE_LABEL_SCALE } from "@/neuralcanvas/lib/canvasConstants";
 
 // ---------------------------------------------------------------------------
 // Colour constants for the three states
@@ -166,17 +167,19 @@ function ConnectionWireComponent({
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
-          {/* Pill badge */}
+          {/* Pill badge — scaled smaller than blocks */}
           <div
             className="
-              relative px-2.5 py-1 rounded-full
-              text-[10px] font-mono font-medium leading-none
+              relative rounded-full
+              font-mono font-medium leading-none
               backdrop-blur-md shadow-lg
               border
               transition-all duration-300 ease-out
               select-none cursor-default
             "
             style={{
+              padding: `${4 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE}px ${8 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE}px`,
+              fontSize: `${9 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE}px`,
               backgroundColor: colors.bg,
               borderColor: colors.border,
               color: colors.text,
@@ -186,8 +189,11 @@ function ConnectionWireComponent({
           >
             {/* Dot indicator */}
             <span
-              className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle"
+              className="inline-block rounded-full align-middle"
               style={{
+                width: 3 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE,
+                height: 3 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE,
+                marginRight: 4 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE,
                 backgroundColor: colors.stroke,
                 boxShadow: `0 0 4px ${colors.stroke}`,
               }}
@@ -195,77 +201,29 @@ function ConnectionWireComponent({
             {wireState === "error" ? "⚠ mismatch" : shapeLabel}
           </div>
 
-          {/* ── Rich hover tooltip ── */}
+          {/* ── Compact hover tooltip ── */}
           {hovered && (
             <div
-              className="
-                absolute left-1/2 -translate-x-1/2 mt-2 z-50
-                w-64 p-3 rounded-xl
-                backdrop-blur-xl shadow-2xl
-                border
-                animate-fade-in
-              "
+              className="absolute left-1/2 -translate-x-1/2 mt-1.5 z-50 rounded-md border shadow-lg backdrop-blur-sm animate-fade-in max-w-[200px] truncate"
               style={{
+                padding: "4px 8px",
                 backgroundColor: colors.bg,
                 borderColor: colors.border,
+                fontSize: "10px",
+                color: colors.text,
               }}
+              title={description}
             >
-              {/* Shape heading */}
-              <div className="flex items-center gap-2 mb-2">
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: colors.stroke }}
-                />
-                <span
-                  className="text-[11px] font-bold"
-                  style={{ color: colors.text }}
-                >
-                  {wireState === "valid"
-                    ? "Valid Connection"
-                    : wireState === "error"
-                      ? "Shape Mismatch"
-                      : "Shape Unknown"}
-                </span>
-              </div>
-
-              {/* Shape label */}
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-[9px] text-neutral-500">shape</span>
-                <span
-                  className="text-[11px] font-mono font-semibold"
-                  style={{ color: colors.text }}
-                >
-                  {shapeLabel}
-                </span>
-              </div>
-
-              {/* Human-readable description */}
-              <p className="text-[10px] leading-relaxed mb-2" style={{ color: `${colors.text}cc` }}>
-                {description}
-              </p>
-
-              {/* Route info */}
-              <div
-                className="flex items-center gap-1.5 text-[9px] font-mono pt-2 border-t"
-                style={{ borderColor: `${colors.border}`, color: `${colors.text}99` }}
-              >
-                <span>{sourceLabel}</span>
-                <span className="text-neutral-600">→</span>
-                <span>{targetLabel}</span>
-              </div>
-
-              {/* Error detail */}
+              <span className="font-mono font-medium">{shapeLabel}</span>
+              <span className="text-neutral-500 mx-1.5">·</span>
+              <span className="text-neutral-500 font-mono text-[9px]">
+                {sourceLabel} → {targetLabel}
+              </span>
               {hasError && (
-                <div
-                  className="mt-2 p-2 rounded-lg text-[10px] leading-relaxed border"
-                  style={{
-                    backgroundColor: "rgba(127,29,29,0.3)",
-                    borderColor: "rgba(239,68,68,0.25)",
-                    color: "#fca5a5",
-                  }}
-                >
-                  {edgeError}
-                </div>
+                <>
+                  <span className="text-neutral-600 mx-1.5">·</span>
+                  <span className="text-red-400 text-[9px] truncate">{edgeError}</span>
+                </>
               )}
             </div>
           )}

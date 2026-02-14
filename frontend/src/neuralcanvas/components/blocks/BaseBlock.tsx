@@ -30,23 +30,24 @@ import {
   type BlockDefinition,
   type ParamSchema,
 } from "@/neuralcanvas/lib/blockRegistry";
+import { CANVAS_UI_SCALE, BLOCK_FIXED_SIZE } from "@/neuralcanvas/lib/canvasConstants";
 import { getShapeLabel } from "@/neuralcanvas/lib/shapeEngine";
 import { useShapes } from "@/neuralcanvas/components/canvas/ShapeContext";
 import { usePeepInsideContext } from "@/neuralcanvas/components/peep-inside/PeepInsideContext";
 import { useGradientFlow, healthToColor } from "@/neuralcanvas/components/peep-inside/GradientFlowContext";
 import {
-  Database,
-  CircleDot,
-  ArrowRightLeft,
+  Inbox,
+  Target,
+  Rows3,
   Grid3X3,
-  Repeat,
-  ScanEye,
-  AlignCenterHorizontal,
-  BarChartHorizontal,
+  RefreshCw,
+  Focus,
+  SlidersHorizontal,
+  BarChart3,
   Zap,
-  Dice3,
-  MoveHorizontal,
-  TextCursorInput,
+  Shuffle,
+  FoldHorizontal,
+  Hash,
   Percent,
   Eye,
   AlertCircle,
@@ -59,22 +60,22 @@ import {
 // Icon map
 // ---------------------------------------------------------------------------
 
-/** Uniform scale for block size on the playground (0.72 = 72% of design size). */
-const BLOCK_SCALE = 0.72;
+/** Uniform scale for block size on the playground (matches canvas shape displays). */
+const BLOCK_SCALE = CANVAS_UI_SCALE;
 
 export const ICON_MAP: Record<string, LucideIcon> = {
-  database: Database,
-  "circle-dot": CircleDot,
-  "arrow-right-left": ArrowRightLeft,
+  inbox: Inbox,
+  target: Target,
+  "rows-3": Rows3,
   "grid-3x3": Grid3X3,
-  repeat: Repeat,
-  "scan-eye": ScanEye,
-  "align-center-horizontal": AlignCenterHorizontal,
-  "bar-chart-horizontal": BarChartHorizontal,
+  "refresh-cw": RefreshCw,
+  focus: Focus,
+  "sliders-horizontal": SlidersHorizontal,
+  "bar-chart-3": BarChart3,
   zap: Zap,
-  "dice-3": Dice3,
-  "move-horizontal": MoveHorizontal,
-  "text-cursor-input": TextCursorInput,
+  shuffle: Shuffle,
+  "fold-horizontal": FoldHorizontal,
+  hash: Hash,
   percent: Percent,
 };
 
@@ -324,21 +325,23 @@ function BaseBlockComponent({
     );
   }
 
+  const fixedPx = BLOCK_FIXED_SIZE * BLOCK_SCALE;
   return (
     <div
       className={`
-        group/block relative
+        group/block relative flex flex-col
         rounded overflow-hidden
         transition-all duration-200
         ${selected ? "ring-2 scale-[1.02]" : ""}
         ${hasError ? "ring-red-500/50" : "ring-white/20"}
       `}
       style={{
-        width: 88 * BLOCK_SCALE,
-        minWidth: 72 * BLOCK_SCALE,
-        maxWidth: 88 * BLOCK_SCALE,
-      }}
-      style={{
+        width: fixedPx,
+        minWidth: fixedPx,
+        maxWidth: fixedPx,
+        height: fixedPx,
+        minHeight: fixedPx,
+        maxHeight: fixedPx,
         boxShadow: gradFlowEnabled && gradGlowColor
           ? `0 0 ${Math.min(gradInfo!.norm * 40, 20)}px ${gradGlowColor}50, 0 2px 12px rgba(0,0,0,0.35)`
           : selected
@@ -356,10 +359,10 @@ function BaseBlockComponent({
           background: `linear-gradient(135deg, ${color}, transparent 60%)`,
         }}
       />
-      <div className="relative bg-neural-surface/95 backdrop-blur-sm rounded border border-neural-border">
+      <div className="relative flex flex-col flex-1 min-h-0 bg-neural-surface/95 backdrop-blur-sm rounded border border-neural-border">
         {/* ══════════ Header bar ══════════ */}
         <div
-          className="flex items-center gap-0.5 px-1 py-px min-h-0 leading-none"
+          className="flex items-center gap-0.5 px-1 py-px min-h-0 leading-none shrink-0"
           style={{
             background: `linear-gradient(135deg, ${color}20 0%, ${color}08 100%)`,
           }}
@@ -395,8 +398,8 @@ function BaseBlockComponent({
           </button>
         </div>
 
-        {/* ══════════ Body — editable params ══════════ */}
-        <div className="px-1 py-px space-y-px leading-none">
+        {/* ══════════ Body — editable params (clips so all blocks stay same size) ══════════ */}
+        <div className="px-1 py-px space-y-px leading-none overflow-hidden flex-1 min-h-0">
           {def.paramSchema.map((schema) => (
             <ParamRow
               key={schema.name}
@@ -407,14 +410,14 @@ function BaseBlockComponent({
             />
           ))}
 
-          {/* Extra custom content from specific blocks */}
+          {/* Extra custom content from specific blocks (Input/Output etc.) */}
           {children}
         </div>
 
         {/* ══════════ Shape bar ══════════ */}
         <div
           className={`
-            flex items-center gap-0.5 px-1 py-px min-h-0 leading-none
+            flex items-center gap-0.5 px-1 py-px min-h-0 leading-none shrink-0
             border-t font-mono
             ${hasError ? "border-red-500/30 bg-red-500/[0.05]" : "border-neural-border bg-white/[0.02]"}
           `}

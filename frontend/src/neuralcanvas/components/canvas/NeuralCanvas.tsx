@@ -54,6 +54,7 @@ import {
 } from "@/neuralcanvas/components/peep-inside/GradientFlowContext";
 import { neuralCanvasToGraphSchema } from "@/lib/levelGraphAdapter";
 import { createPlayground, updatePlayground, getPlayground } from "@/lib/supabase/playgrounds";
+import { getApiBase } from "@/neuralcanvas/lib/trainingApi";
 import {
   InputBlock,
   OutputBlock,
@@ -175,6 +176,9 @@ function CanvasInner({
   const idCounter = useRef(100);
   const reactFlowInstance = useReactFlow();
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackMessages, setFeedbackMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [feedbackChatOpen, setFeedbackChatOpen] = useState(false);
 
   // ── Drag-and-drop from palette ──
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -324,6 +328,52 @@ function CanvasInner({
     }
   }, [nodes, edges, playgroundId, playgroundName, router]);
 
+  // ── Get feedback (chat) ──
+  const handleFeedbackSend = useCallback(
+    async (userMessage: string) => {
+      if (nodes.length === 0 || !userMessage.trim()) return;
+      const newMessages: { role: "user" | "assistant"; content: string }[] = [
+        ...feedbackMessages,
+        { role: "user", content: userMessage.trim() },
+      ];
+      setFeedbackMessages(newMessages);
+      setFeedbackLoading(true);
+      try {
+        const row = playgroundId ? await getPlayground(playgroundId) : null;
+        const metadata = row
+          ? { name: row.name, created_at: (row.graph_json as { metadata?: { created_at?: string } } | undefined)?.metadata?.created_at }
+          : undefined;
+        const graph = neuralCanvasToGraphSchema(nodes, edges, metadata);
+        const base = getApiBase();
+        const res = await fetch(`${base}/api/feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ graph, messages: newMessages }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setFeedbackMessages((m) => [
+            ...m,
+            { role: "assistant", content: (data.detail ?? res.statusText ?? "Request failed") as string },
+          ]);
+          return;
+        }
+        setFeedbackMessages((m) => [
+          ...m,
+          { role: "assistant", content: data.feedback ?? "No response." },
+        ]);
+      } catch (e) {
+        setFeedbackMessages((m) => [
+          ...m,
+          { role: "assistant", content: e instanceof Error ? e.message : "Failed to get feedback." },
+        ]);
+      } finally {
+        setFeedbackLoading(false);
+      }
+    },
+    [nodes, edges, playgroundId, feedbackMessages]
+  );
+
   // ── Keyboard shortcuts ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -468,24 +518,34 @@ function CanvasInner({
 
       {/* ── Top-right toolbar ── */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        <FeedbackButton
+          onSend={handleFeedbackSend}
+          loading={feedbackLoading}
+          disabled={nodes.length === 0}
+          messages={feedbackMessages}
+          chatOpen={feedbackChatOpen}
+          onOpenChat={() => setFeedbackChatOpen(true)}
+          onCloseChat={() => setFeedbackChatOpen(false)}
+        />
         <SaveButton
           onSave={handleSave}
           status={saveStatus}
           disabled={nodes.length === 0}
         />
-        <TrainingToggle
-          open={trainingPanelOpen}
-          onToggle={() => setTrainingPanelOpen((o) => !o)}
-        />
+        <div className="relative">
+          <TrainingToggle
+            open={trainingPanelOpen}
+            onToggle={() => setTrainingPanelOpen((o) => !o)}
+          />
+          <TrainingPanel
+            open={trainingPanelOpen}
+            onClose={() => setTrainingPanelOpen(false)}
+            nodes={nodes}
+            edges={edges}
+            compact
+          />
+        </div>
       </div>
-
-      {/* ── Training panel (slide-out) ── */}
-      <TrainingPanel
-        open={trainingPanelOpen}
-        onClose={() => setTrainingPanelOpen(false)}
-        nodes={nodes}
-        edges={edges}
-      />
 
       {/* ── Bottom bar: keyboard hints + gradient flow toggle ── */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-1.5 rounded-full bg-neural-surface/80 border border-neural-border backdrop-blur text-[10px] font-mono select-none">
@@ -508,6 +568,148 @@ function CanvasInner({
       {/* ── Peep Inside Modal ── */}
       <PeepInsideOverlay />
     </div>
+  );
+}
+
+// ── Feedback button + chat panel ──
+function FeedbackButton({
+  onSend,
+  loading,
+  disabled,
+  messages,
+  chatOpen,
+  onOpenChat,
+  onCloseChat,
+}: {
+  onSend: (text: string) => void;
+  loading: boolean;
+  disabled: boolean;
+  messages: { role: "user" | "assistant"; content: string }[];
+  chatOpen: boolean;
+  onOpenChat: () => void;
+  onCloseChat: () => void;
+}) {
+  const [input, setInput] = useState("");
+
+  const handleSubmit = useCallback(
+    (e?: React.FormEvent) => {
+      e?.preventDefault();
+      const text = input.trim();
+      if (!text || loading || disabled) return;
+      onSend(text);
+      setInput("");
+    },
+    [input, loading, disabled, onSend]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit]
+  );
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={chatOpen ? onCloseChat : onOpenChat}
+        disabled={disabled}
+        className={`
+          flex items-center gap-2 px-3 py-1.5 rounded-full
+          border backdrop-blur text-[10px] font-mono font-semibold
+          transition-all duration-200 select-none
+          ${
+            disabled
+              ? "bg-neural-surface/50 border-neural-border text-neutral-600 cursor-not-allowed"
+              : chatOpen
+                ? "bg-neural-accent/20 border-neural-accent/50 text-neural-accent-light"
+                : "bg-neural-surface/80 border-neural-border text-neutral-300 hover:text-white hover:border-neutral-500"
+          }
+        `}
+        title={disabled ? "Add blocks for feedback" : "Chat about your design"}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+        Feedback
+      </button>
+
+      {chatOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-40"
+            onClick={onCloseChat}
+            aria-hidden="true"
+          />
+          <div
+            className="fixed bottom-4 right-4 w-[360px] max-h-[480px] rounded-2xl bg-neural-surface/95 border border-neural-border/80 shadow-2xl backdrop-blur-xl z-50 flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-neural-border/60 shrink-0">
+              <span className="text-sm font-semibold text-white font-mono">Design feedback</span>
+              <button
+                onClick={onCloseChat}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neural-border/50 transition-colors"
+                aria-label="Close"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+              {messages.map((msg, i) =>
+                msg.role === "user" ? (
+                  <div key={i} className="flex justify-end">
+                    <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-br-md bg-neural-accent/20 border border-neural-accent/30 text-xs text-neutral-200">
+                      {msg.content}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={i} className="flex justify-start">
+                    <div className="max-w-[85%] px-3 py-2.5 rounded-2xl rounded-bl-md bg-neural-bg/80 border border-neural-border/50 text-xs text-neutral-300 whitespace-pre-wrap leading-relaxed">
+                      {msg.content}
+                    </div>
+                  </div>
+                )
+              )}
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-md bg-neural-border/30 text-xs text-neutral-400 flex items-center gap-2">
+                    <span className="animate-pulse">Thinking...</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <form onSubmit={handleSubmit} className="p-3 border-t border-neural-border/60 shrink-0">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask about your design..."
+                rows={1}
+                disabled={loading || disabled}
+                className="w-full px-3 py-2 rounded-xl bg-neural-bg border border-neural-border text-sm text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neural-accent resize-none disabled:opacity-50"
+              />
+              <p className="mt-1 text-[10px] text-neutral-500 font-mono">Press Enter to send</p>
+            </form>
+          </div>
+        </>
+      )}
+    </>
   );
 }
 

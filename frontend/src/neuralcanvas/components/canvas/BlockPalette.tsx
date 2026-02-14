@@ -11,24 +11,26 @@ import {
   type BlockDefinition,
 } from "@/neuralcanvas/lib/blockRegistry";
 import {
-  Database,
-  CircleDot,
-  ArrowRightLeft,
+  Inbox,
+  Target,
+  Rows3,
   Grid3X3,
-  Repeat,
-  ScanEye,
-  AlignCenterHorizontal,
-  BarChartHorizontal,
+  RefreshCw,
+  Focus,
+  SlidersHorizontal,
+  BarChart3,
   Zap,
-  Dice3,
-  MoveHorizontal,
-  TextCursorInput,
+  Shuffle,
+  FoldHorizontal,
+  Hash,
   Percent,
   Search,
   PanelLeftClose,
   PanelLeftOpen,
   ChevronDown,
   ChevronRight,
+  Layers,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,18 +39,18 @@ import {
 // ---------------------------------------------------------------------------
 
 const ICON_MAP: Record<string, LucideIcon> = {
-  database: Database,
-  "circle-dot": CircleDot,
-  "arrow-right-left": ArrowRightLeft,
+  inbox: Inbox,
+  target: Target,
+  "rows-3": Rows3,
   "grid-3x3": Grid3X3,
-  repeat: Repeat,
-  "scan-eye": ScanEye,
-  "align-center-horizontal": AlignCenterHorizontal,
-  "bar-chart-horizontal": BarChartHorizontal,
+  "refresh-cw": RefreshCw,
+  focus: Focus,
+  "sliders-horizontal": SlidersHorizontal,
+  "bar-chart-3": BarChart3,
   zap: Zap,
-  "dice-3": Dice3,
-  "move-horizontal": MoveHorizontal,
-  "text-cursor-input": TextCursorInput,
+  shuffle: Shuffle,
+  "fold-horizontal": FoldHorizontal,
+  hash: Hash,
   percent: Percent,
 };
 
@@ -56,15 +58,15 @@ const ICON_MAP: Record<string, LucideIcon> = {
 const CATEGORIES: {
   key: BlockCategory;
   label: string;
-  emoji: string;
+  icon: LucideIcon;
   color: string;
 }[] = [
-  { key: "input", label: "Input", emoji: "📥", color: "#f59e0b" },
-  { key: "output", label: "Output", emoji: "📤", color: "#22c55e" },
-  { key: "layer", label: "Layers", emoji: "🧱", color: "#6366f1" },
-  { key: "activation", label: "Activations", emoji: "⚡", color: "#f43f5e" },
-  { key: "normalization", label: "Normalization", emoji: "📏", color: "#14b8a6" },
-  { key: "utility", label: "Utility", emoji: "🔧", color: "#8b5cf6" },
+  { key: "input", label: "Input", icon: Inbox, color: "#f59e0b" },
+  { key: "output", label: "Output", icon: Target, color: "#22c55e" },
+  { key: "layer", label: "Layers", icon: Layers, color: "#6366f1" },
+  { key: "activation", label: "Activations", icon: Zap, color: "#f43f5e" },
+  { key: "normalization", label: "Normalization", icon: SlidersHorizontal, color: "#14b8a6" },
+  { key: "utility", label: "Utility", icon: Wrench, color: "#8b5cf6" },
 ];
 
 /** MIME type used in the drag data transfer. */
@@ -191,7 +193,7 @@ const PaletteItem = memo(function PaletteItem({ def }: PaletteItemProps) {
 
 interface CategorySectionProps {
   label: string;
-  emoji: string;
+  icon: LucideIcon;
   color: string;
   blocks: BlockDefinition[];
   defaultOpen?: boolean;
@@ -199,7 +201,7 @@ interface CategorySectionProps {
 
 const CategorySection = memo(function CategorySection({
   label,
-  emoji,
+  icon: Icon,
   color,
   blocks,
   defaultOpen = true,
@@ -224,7 +226,12 @@ const CategorySection = memo(function CategorySection({
           className="w-0.5 h-4 rounded-full shrink-0"
           style={{ backgroundColor: color }}
         />
-        <span className="text-xs select-none">{emoji}</span>
+        <div
+          className="shrink-0 flex items-center justify-center w-5 h-5 rounded"
+          style={{ backgroundColor: `${color}20` }}
+        >
+          <Icon size={12} style={{ color }} />
+        </div>
         <span className="text-[11px] font-semibold text-neutral-300 flex-1 select-none">
           {label}
         </span>
@@ -314,16 +321,19 @@ function BlockPaletteInner() {
       {/* ── Collapsed state: vertical icon strip ── */}
       {collapsed && (
         <div className="flex flex-col items-center gap-3 pt-14 px-1">
-          {CATEGORIES.map((cat) => (
-            <div
-              key={cat.key}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-xs select-none"
-              style={{ backgroundColor: `${cat.color}18` }}
-              title={cat.label}
-            >
-              {cat.emoji}
-            </div>
-          ))}
+          {CATEGORIES.map((cat) => {
+            const CatIcon = cat.icon;
+            return (
+              <div
+                key={cat.key}
+                className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+                style={{ backgroundColor: `${cat.color}18` }}
+                title={cat.label}
+              >
+                <CatIcon size={12} style={{ color: cat.color }} />
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -370,10 +380,10 @@ function BlockPaletteInner() {
               <CategorySection
                 key={cat.key}
                 label={cat.label}
-                emoji={cat.emoji}
+                icon={cat.icon}
                 color={cat.color}
                 blocks={filteredByCategory.get(cat.key) ?? []}
-                defaultOpen={!search} // collapse when searching to show only matches
+                defaultOpen={!search}
               />
             ))}
           </div>

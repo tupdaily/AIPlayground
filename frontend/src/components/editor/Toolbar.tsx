@@ -15,6 +15,8 @@ export default function Toolbar({ playgroundId }: { playgroundId?: string }) {
   const { status } = useTrainingStore();
   const [validating, setValidating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
   const [validationResult, setValidationResult] = useState<{
     valid: boolean;
     message: string;
@@ -47,6 +49,29 @@ export default function Toolbar({ playgroundId }: { playgroundId?: string }) {
       });
     } finally {
       setValidating(false);
+    }
+  };
+
+  const handleGetFeedback = async () => {
+    setFeedbackLoading(true);
+    setFeedback(null);
+    try {
+      const graph = serializeGraph(nodes, edges);
+      const res = await fetch(`${API_BASE}/api/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(graph),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? res.statusText);
+      }
+      const data = await res.json();
+      setFeedback(data.feedback ?? "");
+    } catch (e) {
+      setFeedback(e instanceof Error ? e.message : "Failed to get feedback");
+    } finally {
+      setFeedbackLoading(false);
     }
   };
 
@@ -115,6 +140,13 @@ export default function Toolbar({ playgroundId }: { playgroundId?: string }) {
           {validating ? "Validating…" : "Validate"}
         </button>
         <button
+          onClick={handleGetFeedback}
+          disabled={feedbackLoading || nodes.length === 0}
+          className="px-4 py-2 rounded-full text-sm font-medium bg-[var(--surface-elevated)] text-[var(--foreground-muted)] border border-[var(--border)] hover:bg-[var(--border-muted)] hover:text-[var(--foreground)] hover:border-[var(--border)] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+        >
+          {feedbackLoading ? "Getting feedback…" : "Get feedback"}
+        </button>
+        <button
           onClick={handleExportJSON}
           disabled={nodes.length === 0}
           className="px-4 py-2 rounded-full text-sm font-medium bg-[var(--surface-elevated)] text-[var(--foreground-muted)] border border-[var(--border)] hover:bg-[var(--border-muted)] hover:text-[var(--foreground)] hover:border-[var(--border)] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
@@ -143,6 +175,13 @@ export default function Toolbar({ playgroundId }: { playgroundId?: string }) {
           {validationResult.valid
             ? `Valid · ${validationResult.total_params?.toLocaleString()} params`
             : validationResult.message}
+        </div>
+      )}
+
+      {feedback !== null && (
+        <div className="ml-2 max-w-md px-3 py-2 rounded-lg text-xs bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--foreground)]">
+          <div className="font-medium mb-1 text-[var(--accent)]">Design feedback</div>
+          <div className="whitespace-pre-wrap">{feedback}</div>
         </div>
       )}
 

@@ -155,9 +155,11 @@ def build_model(graph: GraphSchema, input_shape: tuple[int, ...] | None = None) 
     model = DynamicModel(graph, shapes)
 
     # Print compiled model summary to console
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("\n" + "=" * 60)
     print("COMPILED MODEL")
     print("=" * 60)
+    print(f"Device: {device}")
 
     topo = topological_sort(graph)
     nodes_by_id = {n.id: n for n in graph.nodes}

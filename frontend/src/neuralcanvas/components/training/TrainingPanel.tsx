@@ -25,6 +25,7 @@ interface TrainingPanelProps {
   onClose: () => void;
   nodes: Node[];
   edges: Edge[];
+  compact?: boolean;
 }
 
 const DEFAULT_CONFIG: TrainingConfigSchema = {
@@ -35,7 +36,7 @@ const DEFAULT_CONFIG: TrainingConfigSchema = {
   train_split: 0.8,
 };
 
-export function TrainingPanel({ open: isOpen, onClose, nodes, edges }: TrainingPanelProps) {
+export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact }: TrainingPanelProps) {
   const [datasets, setDatasets] = useState<{ id: string; name: string; description: string }[]>([]);
   const [datasetError, setDatasetError] = useState<string | null>(null);
   const [config, setConfig] = useState<TrainingConfigSchema>(DEFAULT_CONFIG);
@@ -167,7 +168,15 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges }: TrainingP
   if (!isOpen) return null;
 
   return (
-    <div className="absolute top-0 right-0 bottom-0 w-[380px] bg-neural-surface border-l border-neural-border shadow-xl flex flex-col z-30">
+    <div
+      className={`
+        flex flex-col z-30 bg-neural-surface border-neural-border shadow-xl
+        ${compact
+          ? "absolute top-full right-0 mt-2 w-[340px] max-h-[70vh] rounded-xl border overflow-hidden"
+          : "absolute top-0 right-0 bottom-0 w-[380px] border-l"
+        }
+      `}
+    >
       <div className="flex items-center justify-between px-4 py-3 border-b border-neural-border">
         <h2 className="text-sm font-semibold text-white font-mono">Training</h2>
         <button

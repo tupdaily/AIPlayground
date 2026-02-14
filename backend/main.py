@@ -2,7 +2,8 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import graphs, datasets, training
+from routers import feedback, graphs, datasets, training
+from config import settings
 
 app = FastAPI(
     title="AIPlayground API",
@@ -19,6 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(feedback.router)
 app.include_router(graphs.router)
 app.include_router(datasets.router)
 app.include_router(training.router)
@@ -37,4 +39,6 @@ async def health():
         "status": "healthy",
         "cuda_available": torch.cuda.is_available(),
         "device": str(torch.device("cuda" if torch.cuda.is_available() else "cpu")),
+        "runpod_enabled": settings.runpod_enabled,
+        "mode": "runpod" if settings.runpod_enabled else "local",
     }

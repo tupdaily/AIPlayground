@@ -44,6 +44,16 @@ class TrainingRequest(BaseModel):
     training_config: TrainingConfig
 
 
+class ChatMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class FeedbackRequest(BaseModel):
+    graph: GraphSchema
+    messages: list[ChatMessage]  # conversation history
+
+
 class ValidationResult(BaseModel):
     valid: bool
     message: str = "OK"

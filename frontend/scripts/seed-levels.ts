@@ -45,29 +45,21 @@ const LEVEL_1_GRAPH: GraphSchema = {
     {
       id: "input_1",
       type: "input",
-      params: { shape: [1, 28, 28] },
-      position: { x: 100, y: 120 },
+      params: {},
+      position: { x: 120, y: 200 },
     },
     {
       id: "output_1",
       type: "output",
-      params: { loss_fn: "CrossEntropyLoss", num_classes: 10 },
-      position: { x: 320, y: 120 },
+      params: {},
+      position: { x: 420, y: 200 },
     },
   ],
-  edges: [
-    {
-      id: "e_input_output",
-      source: "input_1",
-      sourceHandle: "out",
-      target: "output_1",
-      targetHandle: "in",
-    },
-  ],
+  edges: [],
   metadata: {
-    name: "Level 1: Build a simple FFN",
+    name: "Level 1: Connect input to output",
     created_at: new Date().toISOString(),
-    description: "Add a Linear layer between the Input and Output to create a successful feed-forward network.",
+    description: "Connect the Input block to the Output block by adding layers in between (e.g. Flatten, Linear, Activation) to build a feed-forward network.",
   },
 };
 
@@ -89,8 +81,8 @@ async function main() {
     .upsert(
       {
         level_number: 1,
-        name: "Build a simple FFN",
-        description: "Add a Linear layer between the Input and Output to create a successful feed-forward network.",
+        name: "Connect input to output",
+        description: "Connect the Input block to the Output block by adding layers in between (e.g. Flatten, Linear, Activation) to build a feed-forward network.",
         graph_json: LEVEL_1_GRAPH,
       },
       { onConflict: "level_number" }

@@ -14,17 +14,18 @@ import {
 import { getShapeLabel } from "@/neuralcanvas/lib/shapeEngine";
 import { useShapes } from "./ShapeContext";
 import {
-  Database,
-  ArrowRightLeft,
+  Inbox,
+  Target,
+  Rows3,
   Grid3X3,
-  Repeat,
-  ScanEye,
-  AlignCenterHorizontal,
-  BarChartHorizontal,
+  RefreshCw,
+  Focus,
+  SlidersHorizontal,
+  BarChart3,
   Zap,
-  Dice3,
-  MoveHorizontal,
-  TextCursorInput,
+  Shuffle,
+  FoldHorizontal,
+  Hash,
   Percent,
   type LucideIcon,
 } from "lucide-react";
@@ -34,17 +35,18 @@ import {
 // ---------------------------------------------------------------------------
 
 const ICON_MAP: Record<string, LucideIcon> = {
-  database: Database,
-  "arrow-right-left": ArrowRightLeft,
+  inbox: Inbox,
+  target: Target,
+  "rows-3": Rows3,
   "grid-3x3": Grid3X3,
-  repeat: Repeat,
-  "scan-eye": ScanEye,
-  "align-center-horizontal": AlignCenterHorizontal,
-  "bar-chart-horizontal": BarChartHorizontal,
+  "refresh-cw": RefreshCw,
+  focus: Focus,
+  "sliders-horizontal": SlidersHorizontal,
+  "bar-chart-3": BarChart3,
   zap: Zap,
-  "dice-3": Dice3,
-  "move-horizontal": MoveHorizontal,
-  "text-cursor-input": TextCursorInput,
+  shuffle: Shuffle,
+  "fold-horizontal": FoldHorizontal,
+  hash: Hash,
   percent: Percent,
 };
 
