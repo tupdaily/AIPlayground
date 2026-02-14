@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C c:/Users/peter/Documents/AIPlayground log --oneline --all)",
+      "WebFetch(domain:github.com)",
+      "Bash(npx create-next-app@latest:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)"
+    ]
+  }
+}

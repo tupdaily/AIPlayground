@@ -1,0 +1,40 @@
+"""AIPlayground Backend - FastAPI server for visual ML model building."""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from routers import graphs, datasets, training
+
+app = FastAPI(
+    title="AIPlayground API",
+    description="Backend for visual ML model building, training, and evaluation",
+    version="0.1.0",
+)
+
+# CORS: allow frontend to connect
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(graphs.router)
+app.include_router(datasets.router)
+app.include_router(training.router)
+
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "AIPlayground API"}
+
+
+@app.get("/health")
+async def health():
+    import torch
+
+    return {
+        "status": "healthy",
+        "cuda_available": torch.cuda.is_available(),
+        "device": str(torch.device("cuda" if torch.cuda.is_available() else "cpu")),
+    }
