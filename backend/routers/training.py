@@ -22,6 +22,8 @@ router = APIRouter(tags=["training"])
 pending_jobs: dict[str, TrainingRequest] = {}
 # Active stop events: job_id -> asyncio.Event
 stop_events: dict[str, asyncio.Event] = {}
+# Active WebSocket connections: job_id -> WebSocket
+active_connections: dict[str, WebSocket] = {}
 
 
 @router.post("/api/training/start")
@@ -48,6 +50,46 @@ async def stop_training(job_id: str):
     return {"status": "stopping"}
 
 
+@router.post("/api/training/{job_id}/callback")
+async def training_callback(job_id: str, callback_data: dict):
+    """Receive epoch updates from RunPod during training.
+
+    This endpoint is called from RunPod after each epoch completes.
+    It forwards the epoch data to the connected WebSocket client.
+
+    Args:
+        job_id: Training job identifier
+        callback_data: Dict with epoch metrics (type, epoch, train_loss, val_loss, etc.)
+
+    Returns:
+        200 OK if callback was forwarded, 404 if job not found
+    """
+    # Check if WebSocket is connected for this job
+    if job_id not in active_connections:
+        logger.warning("Callback received for unknown job_id=%s (WebSocket may have disconnected)", job_id)
+        raise HTTPException(status_code=404, detail="Job not found or WebSocket disconnected")
+
+    websocket = active_connections[job_id]
+
+    try:
+        # Log the callback
+        if callback_data.get("type") == "epoch":
+            logger.info("Callback epoch job_id=%s epoch=%s train_loss=%s val_loss=%s train_acc=%s val_acc=%s",
+                       job_id, callback_data.get("epoch"), callback_data.get("train_loss"),
+                       callback_data.get("val_loss"), callback_data.get("train_acc"), callback_data.get("val_acc"))
+        elif callback_data.get("type") == "completed":
+            logger.info("Callback completed job_id=%s", job_id)
+
+        # Forward epoch data to WebSocket client
+        await websocket.send_json(callback_data)
+        return {"status": "ok"}
+    except Exception as e:
+        logger.exception("Failed to forward callback to WebSocket job_id=%s: %s", job_id, e)
+        # Remove from active connections if WebSocket is dead
+        active_connections.pop(job_id, None)
+        raise HTTPException(status_code=500, detail="Failed to forward callback")
+
+
 @router.websocket("/ws/training/{job_id}")
 async def training_websocket(websocket: WebSocket, job_id: str):
     """WebSocket endpoint for real-time training metrics.
@@ -70,6 +112,9 @@ async def training_websocket(websocket: WebSocket, job_id: str):
     # Tell client we're connected so it can show "Preparing…" instead of "Connecting…"
     await websocket.send_json({"type": "connected", "message": "Preparing training…"})
     logger.info("Training WebSocket sent 'connected' job_id=%s", job_id)
+
+    # Track active connection for callbacks
+    active_connections[job_id] = websocket
 
     async def ws_callback(msg: dict):
         try:
@@ -108,7 +153,7 @@ async def training_websocket(websocket: WebSocket, job_id: str):
         # Route to RunPod Flash or local training
         if settings.runpod_enabled:
             logger.info("Starting RunPod Flash training job_id=%s dataset_id=%s epochs=%s", job_id, request.dataset_id, request.training_config.epochs)
-            await train_with_runpod_flash(request, ws_callback, stop_event)
+            await train_with_runpod_flash(request, ws_callback, stop_event, job_id)
         else:
             logger.info("Starting local training job_id=%s dataset_id=%s epochs=%s", job_id, request.dataset_id, request.training_config.epochs)
             await train_model(
@@ -125,13 +170,14 @@ async def training_websocket(websocket: WebSocket, job_id: str):
     finally:
         listener_task.cancel()
         stop_events.pop(job_id, None)
+        active_connections.pop(job_id, None)
         try:
             await websocket.close()
         except Exception:
             pass
 
 
-async def train_with_runpod_flash(request, ws_callback, stop_event):
+async def train_with_runpod_flash(request, ws_callback, stop_event, job_id=None):
     """Execute training on RunPod Flash and send results."""
     try:
         # Send started message
@@ -144,10 +190,13 @@ async def train_with_runpod_flash(request, ws_callback, stop_event):
         result = await train_model_flash(
             graph_dict=request.graph.dict(),
             dataset_id=request.dataset_id,
-            config_dict=request.training_config.dict()
+            config_dict=request.training_config.dict(),
+            job_id=job_id,
+            backend_url=settings.backend_url
         )
 
         logger.info(f"RunPod Flash training completed: {result.get('type')}")
+        logger.info(f"RunPod result keys: {result.keys()}")
 
         # Check if it's an error
         if result.get("type") == "error":
@@ -155,18 +204,35 @@ async def train_with_runpod_flash(request, ws_callback, stop_event):
             return
 
         # Send epoch updates from history
+        # If callbacks are enabled, epochs already came via HTTP callbacks
+        # If disabled, replay them here (fallback behavior)
         history = result.get("history", {})
-        for epoch_data in history.get("epochs", []):
-            if stop_event.is_set():
-                await ws_callback({"type": "stopped"})
-                return
+        logger.info(f"History type: {type(history)}, History keys: {history.keys() if isinstance(history, dict) else 'N/A'}")
 
-            await ws_callback({
-                "type": "epoch",
-                **epoch_data
-            })
-            # Small delay so frontend can process updates
-            await asyncio.sleep(0.1)
+        epochs_list = history.get("epochs", [])
+
+        if settings.runpod_callback_enabled and job_id:
+            logger.info(f"Callbacks enabled: skipping epoch replay (updates already sent via HTTP callbacks)")
+        else:
+            logger.info(f"Number of epochs to replay: {len(epochs_list)}")
+            for idx, epoch_data in enumerate(epochs_list):
+                if stop_event.is_set():
+                    await ws_callback({"type": "stopped"})
+                    return
+
+                logger.info(f"Replaying epoch {idx+1}/{len(epochs_list)}: epoch={epoch_data.get('epoch')}")
+                try:
+                    await ws_callback({
+                        "type": "epoch",
+                        **epoch_data
+                    })
+                except Exception as e:
+                    logger.exception(f"Failed to send epoch message: {e}")
+                    raise
+                # Small delay so frontend can process updates
+                await asyncio.sleep(0.1)
+
+            logger.info(f"All {len(epochs_list)} epochs replayed successfully")
 
         # Send final completion message
         await ws_callback({
