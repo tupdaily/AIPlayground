@@ -62,3 +62,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
    - `https://your-domain.com/auth/callback`
 
 After this, sign in with Google and GitHub will work and redirect back to your app.
+
+## 5. Create the playgrounds table (for saving graphs)
+
+To store each user’s saved playgrounds (graphs as JSON), run the migration in the Supabase SQL editor:
+
+1. In Supabase: **SQL Editor** → **New query**.
+2. Paste and run the contents of `frontend/supabase/migrations/20250214000000_create_playgrounds.sql`.
+
+This creates the `playgrounds` table with RLS so users only see and edit their own rows. The app will then be able to list, create, and update playgrounds from the home grid and the editor toolbar.

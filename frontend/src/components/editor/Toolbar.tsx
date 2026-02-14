@@ -4,13 +4,17 @@ import { useGraphStore } from "@/store/graphStore";
 import { useTrainingStore } from "@/store/trainingStore";
 import { serializeGraph } from "@/lib/serialization";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createPlayground, updatePlayground, getPlayground } from "@/lib/supabase/playgrounds";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export default function Toolbar() {
+export default function Toolbar({ playgroundId }: { playgroundId?: string }) {
+  const router = useRouter();
   const { nodes, edges, clearGraph } = useGraphStore();
   const { status } = useTrainingStore();
   const [validating, setValidating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     valid: boolean;
     message: string;
@@ -59,6 +63,31 @@ export default function Toolbar() {
     URL.revokeObjectURL(url);
   };
 
+  const handleSave = async () => {
+    if (nodes.length === 0) return;
+    setSaving(true);
+    try {
+      let graph;
+      if (playgroundId) {
+        const row = await getPlayground(playgroundId);
+        graph = serializeGraph(nodes, edges, {
+          name: row?.name,
+          created_at: row?.graph_json?.metadata?.created_at,
+        });
+        const ok = await updatePlayground(playgroundId, graph);
+        if (ok) setValidationResult({ valid: true, message: "Saved" });
+      } else {
+        graph = serializeGraph(nodes, edges);
+        const result = await createPlayground(graph);
+        if (result) {
+          router.replace(`/playground/${result.id}`);
+        }
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <header className="h-14 flex-shrink-0 flex items-center px-5 border-b border-[var(--border-muted)] bg-[var(--surface)]/80 backdrop-blur-xl">
       <div className="flex items-center gap-1.5">
@@ -72,9 +101,16 @@ export default function Toolbar() {
 
       <div className="flex items-center gap-2 ml-8">
         <button
+          onClick={handleSave}
+          disabled={saving || nodes.length === 0}
+          className="px-4 py-2 rounded-full text-sm font-medium bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[var(--accent)] transition-all duration-200"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button
           onClick={handleValidate}
           disabled={validating || nodes.length === 0}
-          className="px-4 py-2 rounded-full text-sm font-medium bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[var(--accent)] transition-all duration-200"
+          className="px-4 py-2 rounded-full text-sm font-medium bg-[var(--surface-elevated)] text-[var(--foreground-muted)] border border-[var(--border)] hover:bg-[var(--border-muted)] hover:text-[var(--foreground)] hover:border-[var(--border)] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
         >
           {validating ? "Validating…" : "Validate"}
         </button>
