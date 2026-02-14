@@ -132,30 +132,49 @@ async def training_websocket(websocket: WebSocket, job_id: str):
 
 
 async def train_with_runpod_flash(request, ws_callback, stop_event):
-    """Execute training on RunPod Flash and stream results."""
+    """Execute training on RunPod Flash and send results."""
     try:
-        # Call the @remote decorated function
-        # First await the call to get the remote job/generator
-        remote_job = await train_model_flash(
+        # Send started message
+        await ws_callback({
+            "type": "started",
+            "message": "Training started on RunPod GPU..."
+        })
+
+        # Call the @remote decorated function (returns single result, not a stream)
+        result = await train_model_flash(
             graph_dict=request.graph.dict(),
             dataset_id=request.dataset_id,
             config_dict=request.training_config.dict()
         )
 
-        logger.info(f"RunPod Flash job created: {type(remote_job)}")
+        logger.info(f"RunPod Flash training completed: {result.get('type')}")
 
-        # Now iterate over the results
-        async for message in remote_job:
+        # Check if it's an error
+        if result.get("type") == "error":
+            await ws_callback(result)
+            return
+
+        # Send epoch updates from history
+        history = result.get("history", {})
+        for epoch_data in history.get("epochs", []):
             if stop_event.is_set():
-                # Note: RunPod Flash doesn't support cancellation mid-execution
-                # The job will complete, but we stop sending updates
                 await ws_callback({"type": "stopped"})
-                break
+                return
 
-            await ws_callback(message)
+            await ws_callback({
+                "type": "epoch",
+                **epoch_data
+            })
+            # Small delay so frontend can process updates
+            await asyncio.sleep(0.1)
 
-            if message.get("type") in ("completed", "error"):
-                break
+        # Send final completion message
+        await ws_callback({
+            "type": "completed",
+            "final_metrics": result.get("final_metrics"),
+            "model_state_dict_b64": result.get("model_state_dict_b64"),
+            "model_size_bytes": result.get("model_size_bytes")
+        })
 
     except Exception as e:
         logger.exception(f"RunPod Flash training failed: {e}")

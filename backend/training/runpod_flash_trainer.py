@@ -6,9 +6,9 @@ import asyncio
 
 # Configure GPU resources for RunPod Flash
 gpu_config = LiveServerless(
-    name="aiplayground-training",
-    gpus=[GpuGroup.AMPERE_48],  # or GpuGroup.A4000 for lower cost
-    workersMax=3,
+    name="aiplayground-training-v2",  # Changed name to force fresh deployment
+    gpus=[GpuGroup.AMPERE_24],  # Using A4000/RTX 3090 (24GB) - more available and cheaper
+    workersMax=1,  # Reduced to 1 for faster initialization
     workersMin=0,  # Auto-scale from 0 (no idle workers)
     idleTimeout=10  # Scale down after 10 seconds of inactivity
 )
@@ -19,7 +19,8 @@ gpu_config = LiveServerless(
     dependencies=[
         "torch>=2.0.0",
         "torchvision>=0.15.0",
-        "pydantic==2.10.4"
+        "pydantic==2.10.4",
+        "git+https://github.com/Ryan6407/AIPlayground.git#subdirectory=backend"
     ]
 )
 async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict):
@@ -27,18 +28,15 @@ async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict
     Remote training function that runs on RunPod Flash GPU.
 
     This function is automatically containerized and deployed by RunPod Flash.
-    It yields progress messages and returns the trained model.
+    It returns all training results at once (streaming not supported by RunPod).
 
     Args:
         graph_dict: GraphSchema as dict
         dataset_id: "mnist", "fashion_mnist", or "cifar10"
         config_dict: TrainingConfig as dict
 
-    Yields:
-        Progress messages: {"type": "batch"|"epoch"|"started"|"completed"|"error", ...}
-
     Returns:
-        Final result with model state_dict
+        Dict with training history and final model state_dict
     """
     import torch
     import torch.nn as nn
@@ -88,15 +86,15 @@ async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict
         opt_factory = opt_map.get(config.optimizer, opt_map["adam"])
         optimizer = opt_factory(model.parameters(), config.learning_rate)
 
-        # Yield "started" message
-        yield {
-            "type": "started",
-            "total_epochs": config.epochs,
-            "total_batches": len(train_loader),
-            "device": str(device)
-        }
-
         start_time = time.time()
+
+        # Collect training history
+        history = {
+            "epochs": [],
+            "device": str(device),
+            "total_epochs": config.epochs,
+            "total_batches": len(train_loader)
+        }
 
         # Training loop
         for epoch in range(1, config.epochs + 1):
@@ -118,15 +116,6 @@ async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict
                 _, predicted = output.max(1)
                 total += target.size(0)
                 correct += predicted.eq(target).sum().item()
-
-                # Yield batch update every 50 batches
-                if batch_idx % 50 == 0:
-                    yield {
-                        "type": "batch",
-                        "epoch": epoch,
-                        "batch": batch_idx,
-                        "loss": round(loss.item(), 6)
-                    }
 
             train_loss = epoch_loss / len(train_loader)
             train_acc = correct / total if total > 0 else 0
@@ -151,25 +140,25 @@ async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict
             val_acc = val_correct / val_total if val_total > 0 else 0
             elapsed = time.time() - start_time
 
-            # Yield epoch metrics
-            yield {
-                "type": "epoch",
+            # Record epoch metrics
+            history["epochs"].append({
                 "epoch": epoch,
                 "train_loss": round(train_loss, 6),
                 "val_loss": round(val_loss, 6),
                 "train_acc": round(train_acc, 4),
                 "val_acc": round(val_acc, 4),
                 "elapsed_sec": round(elapsed, 1)
-            }
+            })
 
         # Serialize model as base64
         model_bytes = io.BytesIO()
         torch.save(model.state_dict(), model_bytes)
         model_b64 = base64.b64encode(model_bytes.getvalue()).decode()
 
-        # Yield completion message
-        yield {
+        # Return all results
+        return {
             "type": "completed",
+            "history": history,
             "final_metrics": {
                 "train_loss": round(train_loss, 6),
                 "val_loss": round(val_loss, 6),
@@ -182,7 +171,7 @@ async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict
 
     except Exception as e:
         import traceback
-        yield {
+        return {
             "type": "error",
             "message": str(e),
             "traceback": traceback.format_exc()
