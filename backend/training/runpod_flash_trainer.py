@@ -6,11 +6,11 @@ import asyncio
 
 # Configure GPU resources for RunPod Flash
 gpu_config = LiveServerless(
-    name="aiplayground-training-v2",  # Changed name to force fresh deployment
+    name="aiplayground-training-v2",  # Static name for endpoint reuse
     gpus=[GpuGroup.AMPERE_24],  # Using A4000/RTX 3090 (24GB) - more available and cheaper
     workersMax=1,  # Reduced to 1 for faster initialization
     workersMin=0,  # Auto-scale from 0 (no idle workers)
-    idleTimeout=10  # Scale down after 10 seconds of inactivity
+    idleTimeout=300  # Scale down after 10 seconds of inactivity
 )
 
 
@@ -20,20 +20,23 @@ gpu_config = LiveServerless(
         "torch>=2.0.0",
         "torchvision>=0.15.0",
         "pydantic==2.10.4",
-        "git+https://github.com/Ryan6407/AIPlayground.git#subdirectory=backend"
+        "git+https://github.com/Ryan6407/AIPlayground.git#subdirectory=backend",
+        "requests>=2.28.0"
     ]
 )
-async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict):
+async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict, job_id: str = None, backend_url: str = None):
     """
     Remote training function that runs on RunPod Flash GPU.
 
     This function is automatically containerized and deployed by RunPod Flash.
-    It returns all training results at once (streaming not supported by RunPod).
+    Supports real-time epoch callbacks to stream progress during training.
 
     Args:
         graph_dict: GraphSchema as dict
         dataset_id: "mnist", "fashion_mnist", or "cifar10"
         config_dict: TrainingConfig as dict
+        job_id: Training job ID (for callbacks)
+        backend_url: Backend URL for callbacks (e.g., http://localhost:8000)
 
     Returns:
         Dict with training history and final model state_dict
@@ -141,14 +144,28 @@ async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict
             elapsed = time.time() - start_time
 
             # Record epoch metrics
-            history["epochs"].append({
+            epoch_data = {
                 "epoch": epoch,
                 "train_loss": round(train_loss, 6),
                 "val_loss": round(val_loss, 6),
                 "train_acc": round(train_acc, 4),
                 "val_acc": round(val_acc, 4),
                 "elapsed_sec": round(elapsed, 1)
-            })
+            }
+            history["epochs"].append(epoch_data)
+
+            # Send callback to backend if configured
+            if job_id and backend_url:
+                try:
+                    import requests
+                    callback_url = f"{backend_url}/api/training/{job_id}/callback"
+                    requests.post(
+                        callback_url,
+                        json={"type": "epoch", **epoch_data},
+                        timeout=5
+                    )
+                except Exception as e:
+                    print(f"Callback failed (continuing): {e}")
 
         # Serialize model as base64
         model_bytes = io.BytesIO()
