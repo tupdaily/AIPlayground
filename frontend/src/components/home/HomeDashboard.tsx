@@ -274,67 +274,136 @@ export function HomeDashboard({ user }: { user: User }) {
                     </div>
                   ) : (() => {
                     const paperLevels = levels.filter((l) => (l.section ?? "challenges") === "papers");
-                    return paperLevels.length === 0 ? (
-                      <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 py-16 text-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--surface-elevated)] text-[var(--foreground-muted)]">
-                          <FileText className="h-8 w-8" />
+                    if (paperLevels.length === 0) {
+                      return (
+                        <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 py-16 text-center">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--surface-elevated)] text-[var(--foreground-muted)]">
+                            <FileText className="h-8 w-8" />
+                          </div>
+                          <p className="font-medium text-[var(--foreground)]">
+                            No papers yet
+                          </p>
+                          <p className="max-w-sm text-sm text-[var(--foreground-muted)]">
+                            Paper-based design tasks will appear here.
+                          </p>
                         </div>
-                        <p className="font-medium text-[var(--foreground)]">
-                          No papers yet
-                        </p>
-                        <p className="max-w-sm text-sm text-[var(--foreground-muted)]">
-                          Paper-based design tasks will appear here.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-                        {paperLevels.map((level) => {
-                          const completed = completedLevels.has(level.level_number);
-                          const totalSteps = PAPER_WALKTHROUGHS[level.level_number]?.length ?? 0;
-                          const stepIndex = paperProgress[level.level_number] ?? -1;
-                          const percent = totalSteps > 0
-                            ? Math.min(100, Math.round(((stepIndex + 1) / totalSteps) * 100))
-                            : 0;
+                      );
+                    }
+                    const categoryOrder = ["vision", "language", "other"] as const;
+                    const categoryLabels: Record<string, string> = {
+                      vision: "Vision",
+                      language: "Language",
+                      other: "Other",
+                    };
+                    const byCategory = new Map<string, typeof paperLevels>();
+                    for (const level of paperLevels) {
+                      const cat = level.paper_category ?? "other";
+                      if (!byCategory.has(cat)) byCategory.set(cat, []);
+                      byCategory.get(cat)!.push(level);
+                    }
+                    return (
+                      <div className="space-y-8">
+                        {categoryOrder.map((cat) => {
+                          const list = byCategory.get(cat);
+                          if (!list?.length) return null;
                           return (
-                            <Link
-                              key={level.id}
-                              href={`/playground?level=${level.level_number}`}
-                              className="group rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] min-h-[140px] p-5 flex flex-col transition hover:border-amber-500/50 hover:bg-[var(--surface)] hover:shadow-[var(--glow)]"
-                            >
-                              <span className="mb-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)] transition group-hover:bg-[var(--accent-muted)]/80">
-                                {completed ? (
-                                  <Check className="h-5 w-5 text-emerald-500" />
-                                ) : (
-                                  <FileText className="h-5 w-5" />
-                                )}
-                              </span>
-                              <span className="text-xs font-medium text-[var(--foreground-muted)]">
-                                Paper
-                                {percent > 0 && (
-                                  <span className="ml-1.5 text-amber-600 dark:text-amber-400 font-medium">
-                                    · {percent}%
-                                  </span>
-                                )}
-                                {completed && (
-                                  <span className="ml-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
-                                    · Completed
-                                  </span>
-                                )}
-                              </span>
-                              <h3 className="font-medium text-[var(--foreground)] mt-0.5 truncate">
-                                {level.name}
+                            <div key={cat}>
+                              <h3 className="text-sm font-semibold text-[var(--foreground-muted)] uppercase tracking-wider mb-4">
+                                {categoryLabels[cat] ?? cat}
                               </h3>
-                              {level.description && (
-                                <p className="mt-2 text-sm text-[var(--foreground-muted)] line-clamp-2">
-                                  {level.description}
-                                </p>
-                              )}
-                              <span className="mt-auto pt-3 text-sm text-amber-600 dark:text-amber-400 font-medium opacity-0 group-hover:opacity-100 transition">
-                                {completed ? "Play again →" : "Design →"}
-                              </span>
-                            </Link>
+                              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+                                {list.map((level) => {
+                                  const completed = completedLevels.has(level.level_number);
+                                  const totalSteps = PAPER_WALKTHROUGHS[level.level_number]?.length ?? 0;
+                                  const stepIndex = paperProgress[level.level_number] ?? -1;
+                                  const percent = totalSteps > 0
+                                    ? Math.min(100, Math.round(((stepIndex + 1) / totalSteps) * 100))
+                                    : 0;
+                                  return (
+                                    <Link
+                                      key={level.id}
+                                      href={`/playground?level=${level.level_number}`}
+                                      className="group rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] min-h-[140px] p-5 flex flex-col transition hover:border-amber-500/50 hover:bg-[var(--surface)] hover:shadow-[var(--glow)]"
+                                    >
+                                      <span className="mb-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)] transition group-hover:bg-[var(--accent-muted)]/80">
+                                        {completed ? (
+                                          <Check className="h-5 w-5 text-emerald-500" />
+                                        ) : (
+                                          <FileText className="h-5 w-5" />
+                                        )}
+                                      </span>
+                                      <span className="text-xs font-medium text-[var(--foreground-muted)]">
+                                        Paper
+                                        {percent > 0 && (
+                                          <span className="ml-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                                            · {percent}%
+                                          </span>
+                                        )}
+                                        {completed && (
+                                          <span className="ml-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                                            · Completed
+                                          </span>
+                                        )}
+                                      </span>
+                                      <h3 className="font-medium text-[var(--foreground)] mt-0.5 truncate">
+                                        {level.name}
+                                      </h3>
+                                      {level.description && (
+                                        <p className="mt-2 text-sm text-[var(--foreground-muted)] line-clamp-2">
+                                          {level.description}
+                                        </p>
+                                      )}
+                                      <span className="mt-auto pt-3 text-sm text-amber-600 dark:text-amber-400 font-medium opacity-0 group-hover:opacity-100 transition">
+                                        {completed ? "Play again →" : "Design →"}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           );
                         })}
+                        {/* Uncategorized papers not in categoryOrder */}
+                        {Array.from(byCategory.keys())
+                          .filter((c) => !categoryOrder.includes(c as typeof categoryOrder[number]))
+                          .map((cat) => (
+                            <div key={cat}>
+                              <h3 className="text-sm font-semibold text-[var(--foreground-muted)] uppercase tracking-wider mb-4">
+                                {categoryLabels[cat] ?? cat}
+                              </h3>
+                              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+                                {byCategory.get(cat)!.map((level) => {
+                                  const completed = completedLevels.has(level.level_number);
+                                  const totalSteps = PAPER_WALKTHROUGHS[level.level_number]?.length ?? 0;
+                                  const stepIndex = paperProgress[level.level_number] ?? -1;
+                                  const percent = totalSteps > 0
+                                    ? Math.min(100, Math.round(((stepIndex + 1) / totalSteps) * 100))
+                                    : 0;
+                                  return (
+                                    <Link
+                                      key={level.id}
+                                      href={`/playground?level=${level.level_number}`}
+                                      className="group rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] min-h-[140px] p-5 flex flex-col transition hover:border-amber-500/50 hover:bg-[var(--surface)] hover:shadow-[var(--glow)]"
+                                    >
+                                      <span className="mb-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)] transition group-hover:bg-[var(--accent-muted)]/80">
+                                        {completed ? <Check className="h-5 w-5 text-emerald-500" /> : <FileText className="h-5 w-5" />}
+                                      </span>
+                                      <span className="text-xs font-medium text-[var(--foreground-muted)]">
+                                        Paper
+                                        {percent > 0 && <span className="ml-1.5 text-amber-600 dark:text-amber-400 font-medium">· {percent}%</span>}
+                                        {completed && <span className="ml-1.5 text-emerald-600 dark:text-emerald-400 font-medium">· Completed</span>}
+                                      </span>
+                                      <h3 className="font-medium text-[var(--foreground)] mt-0.5 truncate">{level.name}</h3>
+                                      {level.description && <p className="mt-2 text-sm text-[var(--foreground-muted)] line-clamp-2">{level.description}</p>}
+                                      <span className="mt-auto pt-3 text-sm text-amber-600 dark:text-amber-400 font-medium opacity-0 group-hover:opacity-100 transition">
+                                        {completed ? "Play again →" : "Design →"}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
                       </div>
                     );
                   })()}

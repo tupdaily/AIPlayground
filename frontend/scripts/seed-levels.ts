@@ -502,6 +502,110 @@ const GPT_PAPER_GRAPH: GraphSchema = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Paper: LeNet-5 (LeCun et al.)
+// ---------------------------------------------------------------------------
+
+// Block width is ~260px; use 320px spacing so blocks don't overlap.
+const LENET5_SPACING = 320;
+const LENET5_PAPER_GRAPH: GraphSchema = {
+  version: "1.0",
+  nodes: [
+    { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
+    { id: "conv1", type: "conv2d", params: { in_channels: 1, out_channels: 6, kernel_size: 5, stride: 1, padding: 0 }, position: { x: 80 + LENET5_SPACING * 1, y: 200 } },
+    { id: "tanh1", type: "activation", params: { activation: "tanh" }, position: { x: 80 + LENET5_SPACING * 2, y: 200 } },
+    { id: "pool1", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 80 + LENET5_SPACING * 3, y: 200 } },
+    { id: "conv2", type: "conv2d", params: { in_channels: 6, out_channels: 16, kernel_size: 5, stride: 1, padding: 0 }, position: { x: 80 + LENET5_SPACING * 4, y: 200 } },
+    { id: "tanh2", type: "activation", params: { activation: "tanh" }, position: { x: 80 + LENET5_SPACING * 5, y: 200 } },
+    { id: "pool2", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 80 + LENET5_SPACING * 6, y: 200 } },
+    { id: "flatten_1", type: "flatten", params: {}, position: { x: 80 + LENET5_SPACING * 7, y: 200 } },
+    { id: "fc1", type: "linear", params: { in_features: 256, out_features: 120 }, position: { x: 80 + LENET5_SPACING * 8, y: 200 } },
+    { id: "tanh3", type: "activation", params: { activation: "tanh" }, position: { x: 80 + LENET5_SPACING * 9, y: 200 } },
+    { id: "fc2", type: "linear", params: { in_features: 120, out_features: 84 }, position: { x: 80 + LENET5_SPACING * 10, y: 200 } },
+    { id: "tanh4", type: "activation", params: { activation: "tanh" }, position: { x: 80 + LENET5_SPACING * 11, y: 200 } },
+    { id: "fc3", type: "linear", params: { in_features: 84, out_features: 10 }, position: { x: 80 + LENET5_SPACING * 12, y: 200 } },
+    { id: "output_1", type: "output", params: {}, position: { x: 80 + LENET5_SPACING * 13, y: 200 } },
+  ],
+  edges: [
+    { id: "e0", source: "input_1", sourceHandle: "out", target: "conv1", targetHandle: "in" },
+    { id: "e1", source: "conv1", sourceHandle: "out", target: "tanh1", targetHandle: "in" },
+    { id: "e2", source: "tanh1", sourceHandle: "out", target: "pool1", targetHandle: "in" },
+    { id: "e3", source: "pool1", sourceHandle: "out", target: "conv2", targetHandle: "in" },
+    { id: "e4", source: "conv2", sourceHandle: "out", target: "tanh2", targetHandle: "in" },
+    { id: "e5", source: "tanh2", sourceHandle: "out", target: "pool2", targetHandle: "in" },
+    { id: "e6", source: "pool2", sourceHandle: "out", target: "flatten_1", targetHandle: "in" },
+    { id: "e7", source: "flatten_1", sourceHandle: "out", target: "fc1", targetHandle: "in" },
+    { id: "e8", source: "fc1", sourceHandle: "out", target: "tanh3", targetHandle: "in" },
+    { id: "e9", source: "tanh3", sourceHandle: "out", target: "fc2", targetHandle: "in" },
+    { id: "e10", source: "fc2", sourceHandle: "out", target: "tanh4", targetHandle: "in" },
+    { id: "e11", source: "tanh4", sourceHandle: "out", target: "fc3", targetHandle: "in" },
+    { id: "e12", source: "fc3", sourceHandle: "out", target: "output_1", targetHandle: "in" },
+  ],
+  metadata: {
+    name: "LeNet-5 (LeCun et al.)",
+    created_at: new Date().toISOString(),
+    description: "LeNet-5: Conv(6, 5×5) → tanh → MaxPool(2×2) → Conv(16, 5×5) → tanh → MaxPool(2×2) → Flatten → FC(120) → tanh → FC(84) → tanh → FC(10). Classic architecture for digit recognition; original paper used tanh/sigmoid.",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Paper: VGG — Very Deep Convolutional Networks (Simonyan & Zisserman)
+// ---------------------------------------------------------------------------
+
+// Block width is ~260px; use 320px spacing so blocks don't overlap.
+const VGG_SPACING = 320;
+const VGG_PAPER_GRAPH: GraphSchema = {
+  version: "1.0",
+  nodes: [
+    { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
+    { id: "conv1", type: "conv2d", params: { in_channels: 1, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 80 + VGG_SPACING * 1, y: 200 } },
+    { id: "relu1", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 2, y: 200 } },
+    { id: "conv2", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 80 + VGG_SPACING * 3, y: 200 } },
+    { id: "relu2", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 4, y: 200 } },
+    { id: "pool1", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 80 + VGG_SPACING * 5, y: 200 } },
+    { id: "conv3", type: "conv2d", params: { in_channels: 64, out_channels: 128, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 80 + VGG_SPACING * 6, y: 200 } },
+    { id: "relu3", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 7, y: 200 } },
+    { id: "conv4", type: "conv2d", params: { in_channels: 128, out_channels: 128, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 80 + VGG_SPACING * 8, y: 200 } },
+    { id: "relu4", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 9, y: 200 } },
+    { id: "pool2", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 80 + VGG_SPACING * 10, y: 200 } },
+    { id: "flatten_1", type: "flatten", params: {}, position: { x: 80 + VGG_SPACING * 11, y: 200 } },
+    { id: "fc1", type: "linear", params: { in_features: 128 * 7 * 7, out_features: 4096 }, position: { x: 80 + VGG_SPACING * 12, y: 200 } },
+    { id: "relu5", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 13, y: 200 } },
+    { id: "dropout1", type: "dropout", params: { p: 0.5 }, position: { x: 80 + VGG_SPACING * 14, y: 200 } },
+    { id: "fc2", type: "linear", params: { in_features: 4096, out_features: 4096 }, position: { x: 80 + VGG_SPACING * 15, y: 200 } },
+    { id: "relu6", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 16, y: 200 } },
+    { id: "dropout2", type: "dropout", params: { p: 0.5 }, position: { x: 80 + VGG_SPACING * 17, y: 200 } },
+    { id: "fc3", type: "linear", params: { in_features: 4096, out_features: 1000 }, position: { x: 80 + VGG_SPACING * 18, y: 200 } },
+    { id: "output_1", type: "output", params: {}, position: { x: 80 + VGG_SPACING * 19, y: 200 } },
+  ],
+  edges: [
+    { id: "e0", source: "input_1", sourceHandle: "out", target: "conv1", targetHandle: "in" },
+    { id: "e1", source: "conv1", sourceHandle: "out", target: "relu1", targetHandle: "in" },
+    { id: "e2", source: "relu1", sourceHandle: "out", target: "conv2", targetHandle: "in" },
+    { id: "e3", source: "conv2", sourceHandle: "out", target: "relu2", targetHandle: "in" },
+    { id: "e4", source: "relu2", sourceHandle: "out", target: "pool1", targetHandle: "in" },
+    { id: "e5", source: "pool1", sourceHandle: "out", target: "conv3", targetHandle: "in" },
+    { id: "e6", source: "conv3", sourceHandle: "out", target: "relu3", targetHandle: "in" },
+    { id: "e7", source: "relu3", sourceHandle: "out", target: "conv4", targetHandle: "in" },
+    { id: "e8", source: "conv4", sourceHandle: "out", target: "relu4", targetHandle: "in" },
+    { id: "e9", source: "relu4", sourceHandle: "out", target: "pool2", targetHandle: "in" },
+    { id: "e10", source: "pool2", sourceHandle: "out", target: "flatten_1", targetHandle: "in" },
+    { id: "e11", source: "flatten_1", sourceHandle: "out", target: "fc1", targetHandle: "in" },
+    { id: "e12", source: "fc1", sourceHandle: "out", target: "relu5", targetHandle: "in" },
+    { id: "e13", source: "relu5", sourceHandle: "out", target: "dropout1", targetHandle: "in" },
+    { id: "e14", source: "dropout1", sourceHandle: "out", target: "fc2", targetHandle: "in" },
+    { id: "e15", source: "fc2", sourceHandle: "out", target: "relu6", targetHandle: "in" },
+    { id: "e16", source: "relu6", sourceHandle: "out", target: "dropout2", targetHandle: "in" },
+    { id: "e17", source: "dropout2", sourceHandle: "out", target: "fc3", targetHandle: "in" },
+    { id: "e18", source: "fc3", sourceHandle: "out", target: "output_1", targetHandle: "in" },
+  ],
+  metadata: {
+    name: "VGG (Simonyan & Zisserman)",
+    created_at: new Date().toISOString(),
+    description: "VGG-style stack: two blocks of 2×Conv(3×3)+ReLU+MaxPool(2×2), then Flatten and three FC layers (4096→4096→1000) with dropout. All convs use 3×3 filters.",
+  },
+};
+
 const LEVELS = [
   { level_number: 1, section: "challenges" as const, name: "Connect input to output", description: LEVEL_1_GRAPH.metadata.description!, task: "Create a feed forward network using the flatten and linear layer", graph_json: LEVEL_1_GRAPH, solution_graph_json: LEVEL_1_SOLUTION },
   { level_number: 2, section: "challenges" as const, name: "Add activation", description: LEVEL_2_GRAPH.metadata.description!, task: "Add a ReLU activation between the Linear layer and the Output (Input → Flatten → Linear → Activation → Output)", graph_json: LEVEL_2_GRAPH, solution_graph_json: LEVEL_2_SOLUTION },
@@ -512,6 +616,7 @@ const LEVELS = [
   {
     level_number: 7,
     section: "papers" as const,
+    paper_category: "language",
     name: "Attention is All You Need (Vaswani et al.)",
     description: TRANSFORMER_PAPER_GRAPH.metadata.description!,
     task: [
@@ -527,6 +632,7 @@ const LEVELS = [
   {
     level_number: 8,
     section: "papers" as const,
+    paper_category: "vision",
     name: "ImageNet Classification with Deep CNNs (Krizhevsky et al.)",
     description: ALEXNET_PAPER_GRAPH.metadata.description!,
     task: [
@@ -542,6 +648,7 @@ const LEVELS = [
   {
     level_number: 9,
     section: "papers" as const,
+    paper_category: "vision",
     name: "Deep Residual Learning for Image Recognition (He et al.)",
     description: RESNET_PAPER_GRAPH.metadata.description!,
     task: [
@@ -557,6 +664,7 @@ const LEVELS = [
   {
     level_number: 10,
     section: "papers" as const,
+    paper_category: "language",
     name: "BERT: Pre-training of Deep Bidirectional Transformers (Devlin et al.)",
     description: BERT_PAPER_GRAPH.metadata.description!,
     task: [
@@ -572,6 +680,7 @@ const LEVELS = [
   {
     level_number: 11,
     section: "papers" as const,
+    paper_category: "language",
     name: "Improving Language Understanding by Generative Pre-Training (GPT)",
     description: GPT_PAPER_GRAPH.metadata.description!,
     task: [
@@ -583,6 +692,36 @@ const LEVELS = [
     ].join("\n"),
     graph_json: GPT_PAPER_GRAPH,
     solution_graph_json: GPT_PAPER_GRAPH,
+  },
+  {
+    level_number: 12,
+    section: "papers" as const,
+    paper_category: "vision",
+    name: "Gradient-Based Learning Applied to Document Recognition (LeNet-5)",
+    description: LENET5_PAPER_GRAPH.metadata.description!,
+    task: [
+      "LeCun et al., 1998. LeNet-5 is the classic CNN for digit recognition (e.g. MNIST).",
+      "• Architecture: Conv(6, 5×5) → tanh → MaxPool(2×2) → Conv(16, 5×5) → tanh → MaxPool(2×2) → Flatten → FC(120) → tanh → FC(84) → tanh → FC(10).",
+      "• The original paper used tanh (and sigmoid at the output); we use tanh to match the paper. Subsampling used 2×2 average pooling; here MaxPool(2×2).",
+      "• Key idea: alternating conv and pooling reduces spatial size; then fully connected layers produce class logits.",
+    ].join("\n"),
+    graph_json: LENET5_PAPER_GRAPH,
+    solution_graph_json: LENET5_PAPER_GRAPH,
+  },
+  {
+    level_number: 13,
+    section: "papers" as const,
+    paper_category: "vision",
+    name: "Very Deep Convolutional Networks for Large-Scale Image Recognition (VGG)",
+    description: VGG_PAPER_GRAPH.metadata.description!,
+    task: [
+      "Simonyan & Zisserman, ICLR 2015. VGG uses only 3×3 convolutions stacked in blocks, with 2×2 MaxPool between blocks.",
+      "• Each block: multiple Conv(3×3) + ReLU, then MaxPool(2×2). Deeper blocks use more channels (64 → 128 → 256 → 512 in full VGG-16).",
+      "• Here: two blocks (64→64 and 128→128 filters), then Flatten and three FC layers (4096→4096→1000) with dropout.",
+      "• Key contribution: depth with small receptive fields improves accuracy; 3×3 convs are the building block of modern CNNs.",
+    ].join("\n"),
+    graph_json: VGG_PAPER_GRAPH,
+    solution_graph_json: VGG_PAPER_GRAPH,
   },
 ];
 

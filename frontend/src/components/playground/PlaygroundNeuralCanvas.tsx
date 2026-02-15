@@ -39,6 +39,7 @@ export default function PlaygroundNeuralCanvas({
   const [challengeTask, setChallengeTask] = useState<string | null>(null);
   const [challengeSolution, setChallengeSolution] = useState<GraphSchema | null>(null);
   const [isPaperLevel, setIsPaperLevel] = useState(false);
+  const [loadedLevelName, setLoadedLevelName] = useState<string | null>(null);
   const [walkthroughStepIndex, setWalkthroughStepIndex] = useState(0);
   const [walkthroughSteps, setWalkthroughSteps] = useState<typeof PAPER_WALKTHROUGHS[7] | null>(null);
   const [quizSelected, setQuizSelected] = useState<string | null>(null);
@@ -81,6 +82,7 @@ export default function PlaygroundNeuralCanvas({
       setChallengeTask(null);
       setChallengeSolution(null);
       setIsPaperLevel(false);
+      setLoadedLevelName(null);
       setWalkthroughSteps(null);
       setWalkthroughStepIndex(0);
       return;
@@ -103,6 +105,7 @@ export default function PlaygroundNeuralCanvas({
           const isPaper = (level.section ?? "challenges") === "papers";
           const steps = levelNum in PAPER_WALKTHROUGHS ? PAPER_WALKTHROUGHS[levelNum as keyof typeof PAPER_WALKTHROUGHS] : null;
           setIsPaperLevel(isPaper);
+          setLoadedLevelName(isPaper && level.name ? level.name : null);
           if (isPaper && steps?.length) {
             setWalkthroughSteps(steps);
             const saved = progress[levelNum] ?? 0;
@@ -128,6 +131,7 @@ export default function PlaygroundNeuralCanvas({
           setChallengeTask(null);
           setChallengeSolution(null);
           setIsPaperLevel(false);
+          setLoadedLevelName(null);
           setWalkthroughSteps(null);
           setWalkthroughStepIndex(0);
           setError("Level not found");
@@ -138,6 +142,7 @@ export default function PlaygroundNeuralCanvas({
         setChallengeTask(null);
         setChallengeSolution(null);
         setIsPaperLevel(false);
+        setLoadedLevelName(null);
         setWalkthroughSteps(null);
         setWalkthroughStepIndex(0);
         setError("Failed to load challenge");
@@ -337,7 +342,7 @@ export default function PlaygroundNeuralCanvas({
           />
         ) : (
           <span className="flex-1 max-w-md mx-4 text-center text-sm text-neural-muted truncate" aria-hidden="true">
-            {levelParam ? `Level ${levelParam}` : ""}
+            {isPaperLevel && loadedLevelName ? loadedLevelName : levelParam ? `Level ${levelParam}` : ""}
           </span>
         )}
         {playgroundId ? (

@@ -110,8 +110,8 @@ const BLOCK_DESCRIPTIONS: Record<keyof typeof NODES, string> = {
   add_1: "Residual connection: adds the attention output to the pre-attention input, then (conceptually) LayerNorm. Preserves gradient flow.",
   ln_mid: "Layer normalization before the feed-forward sublayer. Same role as the pre-attention LayerNorm.",
   linear_1: "Position-wise linear layer that expands the model dimension (e.g. 128 → 512). Adds capacity before the non-linearity.",
-  relu_1: "ReLU activation. Adds non-linearity; the inner dimension is typically 4× the model dimension.",
-  linear_2: "Projects back to model dimension (e.g. 512 → 128). Together with linear_1 and ReLU this is the position-wise FFN.",
+  relu_1: "ReLU activation. The original Transformer used ReLU in the FFN; BERT, GPT, and other LLMs typically use GELU instead (smoother, often better for language).",
+  linear_2: "Projects back to model dimension (e.g. 512 → 128). Together with linear_1 and the activation this is the position-wise FFN.",
   add_2: "Residual connection after the feed-forward block. Add & Norm again to stabilize and preserve gradients.",
   ln_post: "Final LayerNorm before the output. Produces the encoder representation used by the decoder in a full Transformer.",
   output_1: "Encoder output. In a full model this feeds the decoder; here it's the end of the encoder stack.",
@@ -385,7 +385,7 @@ const RESNET_BLOCK_TITLES: Record<typeof RESNET_BLOCK_ORDER[number], string> = {
 };
 
 const RESNET_BLOCK_DESCRIPTIONS: Record<typeof RESNET_BLOCK_ORDER[number], string> = {
-  input_1: "Raw image input. ResNet was designed for 224×224 ImageNet; here we use 28×28 (e.g. MNIST) for compatibility.",
+  input_1: "Raw image input. ResNet was designed for 224×224 ImageNet; here we use 28×28 (e.g. MNIST) so the architecture runs in the playground.",
   conv1: "Stem conv: 64 filters, 3×3, stride 1. In ResNet-18 the stem uses 7×7 stride 2; we simplify to 3×3 for smaller inputs.",
   bn1: "BatchNorm stabilizes activations and accelerates training. ResNet uses BN after every conv, before ReLU.",
   relu1: "ReLU after the stem. This output is the identity path for the first residual block.",
@@ -403,7 +403,7 @@ const RESNET_BLOCK_DESCRIPTIONS: Record<typeof RESNET_BLOCK_ORDER[number], strin
   bn3b: "BatchNorm after conv3b.",
   add2: "Second residual Add. Same idea: identity + learned residual.",
   relu3b: "ReLU after block 2. Then flatten and classify.",
-  flatten_1: "Flattens spatial and channel dimensions. ResNet typically uses global average pool; we use Flatten for compatibility.",
+  flatten_1: "Flattens spatial and channel dimensions. ResNet typically uses global average pool; we use Flatten here.",
   fc: "Final linear layer: 50176 → 10. For ImageNet the paper uses 2048 → 1000.",
   output_1: "Output logits for 10 classes.",
 };
@@ -668,6 +668,257 @@ export const GPT_WALKTHROUGH_STEPS: WalkthroughStep[] = GPT_BLOCK_ORDER.map((blo
   };
 });
 
+// ── LeNet-5 (LeCun et al., 1998) ─────────────────────────────────────────
+const LENET5_STEP_META = {
+  version: "1.0" as const,
+  metadata: { name: "LeNet-5 walkthrough", created_at: new Date().toISOString() },
+};
+
+const LENET5_SPACING = 320;
+const LENET5_NODES = {
+  input_1: { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
+  conv1: { id: "conv1", type: "conv2d", params: { in_channels: 1, out_channels: 6, kernel_size: 5, stride: 1, padding: 0 }, position: { x: 80 + LENET5_SPACING * 1, y: 200 } },
+  tanh1: { id: "tanh1", type: "activation", params: { activation: "tanh" }, position: { x: 80 + LENET5_SPACING * 2, y: 200 } },
+  pool1: { id: "pool1", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 80 + LENET5_SPACING * 3, y: 200 } },
+  conv2: { id: "conv2", type: "conv2d", params: { in_channels: 6, out_channels: 16, kernel_size: 5, stride: 1, padding: 0 }, position: { x: 80 + LENET5_SPACING * 4, y: 200 } },
+  tanh2: { id: "tanh2", type: "activation", params: { activation: "tanh" }, position: { x: 80 + LENET5_SPACING * 5, y: 200 } },
+  pool2: { id: "pool2", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 80 + LENET5_SPACING * 6, y: 200 } },
+  flatten_1: { id: "flatten_1", type: "flatten", params: {}, position: { x: 80 + LENET5_SPACING * 7, y: 200 } },
+  fc1: { id: "fc1", type: "linear", params: { in_features: 256, out_features: 120 }, position: { x: 80 + LENET5_SPACING * 8, y: 200 } },
+  tanh3: { id: "tanh3", type: "activation", params: { activation: "tanh" }, position: { x: 80 + LENET5_SPACING * 9, y: 200 } },
+  fc2: { id: "fc2", type: "linear", params: { in_features: 120, out_features: 84 }, position: { x: 80 + LENET5_SPACING * 10, y: 200 } },
+  tanh4: { id: "tanh4", type: "activation", params: { activation: "tanh" }, position: { x: 80 + LENET5_SPACING * 11, y: 200 } },
+  fc3: { id: "fc3", type: "linear", params: { in_features: 84, out_features: 10 }, position: { x: 80 + LENET5_SPACING * 12, y: 200 } },
+  output_1: { id: "output_1", type: "output", params: {}, position: { x: 80 + LENET5_SPACING * 13, y: 200 } },
+};
+
+const LENET5_EDGES = {
+  e0: { id: "e0", source: "input_1", sourceHandle: "out", target: "conv1", targetHandle: "in" },
+  e1: { id: "e1", source: "conv1", sourceHandle: "out", target: "tanh1", targetHandle: "in" },
+  e2: { id: "e2", source: "tanh1", sourceHandle: "out", target: "pool1", targetHandle: "in" },
+  e3: { id: "e3", source: "pool1", sourceHandle: "out", target: "conv2", targetHandle: "in" },
+  e4: { id: "e4", source: "conv2", sourceHandle: "out", target: "tanh2", targetHandle: "in" },
+  e5: { id: "e5", source: "tanh2", sourceHandle: "out", target: "pool2", targetHandle: "in" },
+  e6: { id: "e6", source: "pool2", sourceHandle: "out", target: "flatten_1", targetHandle: "in" },
+  e7: { id: "e7", source: "flatten_1", sourceHandle: "out", target: "fc1", targetHandle: "in" },
+  e8: { id: "e8", source: "fc1", sourceHandle: "out", target: "tanh3", targetHandle: "in" },
+  e9: { id: "e9", source: "tanh3", sourceHandle: "out", target: "fc2", targetHandle: "in" },
+  e10: { id: "e10", source: "fc2", sourceHandle: "out", target: "tanh4", targetHandle: "in" },
+  e11: { id: "e11", source: "tanh4", sourceHandle: "out", target: "fc3", targetHandle: "in" },
+  e12: { id: "e12", source: "fc3", sourceHandle: "out", target: "output_1", targetHandle: "in" },
+};
+
+const LENET5_BLOCK_ORDER = [
+  "input_1", "conv1", "tanh1", "pool1", "conv2", "tanh2", "pool2",
+  "flatten_1", "fc1", "tanh3", "fc2", "tanh4", "fc3", "output_1",
+] as const;
+
+const LENET5_ALL_EDGES = Object.values(LENET5_EDGES);
+
+function lenet5GraphUpToBlock(index: number) {
+  const nodeIds = new Set(LENET5_BLOCK_ORDER.slice(0, index + 1));
+  const nodes = LENET5_BLOCK_ORDER.slice(0, index + 1).map((id) => LENET5_NODES[id]);
+  const edges = LENET5_ALL_EDGES.filter((e) => nodeIds.has(e.source as typeof LENET5_BLOCK_ORDER[number]) && nodeIds.has(e.target as typeof LENET5_BLOCK_ORDER[number]));
+  return { nodes, edges };
+}
+
+const LENET5_BLOCK_TITLES: Record<typeof LENET5_BLOCK_ORDER[number], string> = {
+  input_1: "Input",
+  conv1: "Conv2D (6 filters, 5×5)",
+  tanh1: "Tanh",
+  pool1: "MaxPool2D (2×2)",
+  conv2: "Conv2D (16 filters, 5×5)",
+  tanh2: "Tanh",
+  pool2: "MaxPool2D (2×2)",
+  flatten_1: "Flatten",
+  fc1: "Linear (256 → 120)",
+  tanh3: "Tanh",
+  fc2: "Linear (120 → 84)",
+  tanh4: "Tanh",
+  fc3: "Linear (84 → 10)",
+  output_1: "Output",
+};
+
+const LENET5_BLOCK_DESCRIPTIONS: Record<typeof LENET5_BLOCK_ORDER[number], string> = {
+  input_1: "Raw image input. LeNet-5 was designed for 32×32 grayscale digits (e.g. MNIST is 28×28); the first conv reduces the spatial size.",
+  conv1: "First conv: 6 filters, 5×5 kernel, no padding. On 32×32 input this gives 28×28×6. The original paper used tanh after this layer.",
+  tanh1: "Tanh activation. LeCun et al. used tanh (and sigmoid at the output); tanh was standard before ReLU became dominant.",
+  pool1: "Subsampling layer: 2×2 max pooling (the paper used average pooling). Reduces 28×28 to 14×14.",
+  conv2: "Second conv: 16 filters, 5×5. Output 10×10×16. Learns higher-level features from the pooled map.",
+  tanh2: "Tanh after the second conv. Same nonlinearity as in the first block.",
+  pool2: "Second 2×2 pool. Reduces to 5×5×16. Then the feature map is flattened for the classifier.",
+  flatten_1: "Flattens 5×5×16 = 400 (or 4×4×16 = 256 for 28×28 input) into a vector for the fully-connected layers.",
+  fc1: "First FC: 256 → 120. The paper used 400→120 for 32×32. Learns a compact representation for the 10 digit classes.",
+  tanh3: "Tanh after the first FC. The paper used tanh throughout the classifier.",
+  fc2: "Second FC: 120 → 84. Further compresses before the output layer.",
+  tanh4: "Tanh after the second FC. The final layer (84 → 10) was followed by a sigmoid or similar in the original for class scores.",
+  fc3: "Output layer: 84 → 10. Produces logits for the 10 digit classes (0–9).",
+  output_1: "Output logits. Softmax (or cross-entropy) is applied at training and inference.",
+};
+
+const LENET5_QUIZ_DISTRACTORS = ["BatchNorm", "Dropout", "LayerNorm", "Softmax"];
+
+function lenet5ChoicesForStep(stepIndex: number): string[] {
+  if (stepIndex >= LENET5_BLOCK_ORDER.length - 1) return [];
+  const correct = LENET5_BLOCK_TITLES[LENET5_BLOCK_ORDER[stepIndex + 1]];
+  const wrong = LENET5_BLOCK_ORDER.filter((_, i) => i !== stepIndex + 1).map((id) => LENET5_BLOCK_TITLES[id]);
+  const pool = [...LENET5_QUIZ_DISTRACTORS, ...wrong].filter((t) => t !== correct);
+  return [correct, ...pool.slice(0, 3)];
+}
+
+export const LENET5_WALKTHROUGH_STEPS: WalkthroughStep[] = LENET5_BLOCK_ORDER.map((blockId, index) => {
+  const { nodes, edges } = lenet5GraphUpToBlock(index);
+  const isLast = index === LENET5_BLOCK_ORDER.length - 1;
+  return {
+    title: LENET5_BLOCK_TITLES[blockId],
+    description: LENET5_BLOCK_DESCRIPTIONS[blockId],
+    ...(!isLast && {
+      nextQuestion: "What layer should come next?",
+      correctNext: LENET5_BLOCK_TITLES[LENET5_BLOCK_ORDER[index + 1]],
+      nextChoices: lenet5ChoicesForStep(index),
+    }),
+    graph: { ...LENET5_STEP_META, nodes, edges },
+  };
+});
+
+// ── VGG (Simonyan & Zisserman, 2015) ─────────────────────────────────────
+const VGG_STEP_META = {
+  version: "1.0" as const,
+  metadata: { name: "VGG walkthrough", created_at: new Date().toISOString() },
+};
+
+const VGG_SPACING = 320;
+const VGG_NODES = {
+  input_1: { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
+  conv1: { id: "conv1", type: "conv2d", params: { in_channels: 1, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 80 + VGG_SPACING * 1, y: 200 } },
+  relu1: { id: "relu1", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 2, y: 200 } },
+  conv2: { id: "conv2", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 80 + VGG_SPACING * 3, y: 200 } },
+  relu2: { id: "relu2", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 4, y: 200 } },
+  pool1: { id: "pool1", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 80 + VGG_SPACING * 5, y: 200 } },
+  conv3: { id: "conv3", type: "conv2d", params: { in_channels: 64, out_channels: 128, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 80 + VGG_SPACING * 6, y: 200 } },
+  relu3: { id: "relu3", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 7, y: 200 } },
+  conv4: { id: "conv4", type: "conv2d", params: { in_channels: 128, out_channels: 128, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 80 + VGG_SPACING * 8, y: 200 } },
+  relu4: { id: "relu4", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 9, y: 200 } },
+  pool2: { id: "pool2", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 80 + VGG_SPACING * 10, y: 200 } },
+  flatten_1: { id: "flatten_1", type: "flatten", params: {}, position: { x: 80 + VGG_SPACING * 11, y: 200 } },
+  fc1: { id: "fc1", type: "linear", params: { in_features: 128 * 7 * 7, out_features: 4096 }, position: { x: 80 + VGG_SPACING * 12, y: 200 } },
+  relu5: { id: "relu5", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 13, y: 200 } },
+  dropout1: { id: "dropout1", type: "dropout", params: { p: 0.5 }, position: { x: 80 + VGG_SPACING * 14, y: 200 } },
+  fc2: { id: "fc2", type: "linear", params: { in_features: 4096, out_features: 4096 }, position: { x: 80 + VGG_SPACING * 15, y: 200 } },
+  relu6: { id: "relu6", type: "activation", params: { activation: "relu" }, position: { x: 80 + VGG_SPACING * 16, y: 200 } },
+  dropout2: { id: "dropout2", type: "dropout", params: { p: 0.5 }, position: { x: 80 + VGG_SPACING * 17, y: 200 } },
+  fc3: { id: "fc3", type: "linear", params: { in_features: 4096, out_features: 1000 }, position: { x: 80 + VGG_SPACING * 18, y: 200 } },
+  output_1: { id: "output_1", type: "output", params: {}, position: { x: 80 + VGG_SPACING * 19, y: 200 } },
+};
+
+const VGG_EDGES = {
+  e0: { id: "e0", source: "input_1", sourceHandle: "out", target: "conv1", targetHandle: "in" },
+  e1: { id: "e1", source: "conv1", sourceHandle: "out", target: "relu1", targetHandle: "in" },
+  e2: { id: "e2", source: "relu1", sourceHandle: "out", target: "conv2", targetHandle: "in" },
+  e3: { id: "e3", source: "conv2", sourceHandle: "out", target: "relu2", targetHandle: "in" },
+  e4: { id: "e4", source: "relu2", sourceHandle: "out", target: "pool1", targetHandle: "in" },
+  e5: { id: "e5", source: "pool1", sourceHandle: "out", target: "conv3", targetHandle: "in" },
+  e6: { id: "e6", source: "conv3", sourceHandle: "out", target: "relu3", targetHandle: "in" },
+  e7: { id: "e7", source: "relu3", sourceHandle: "out", target: "conv4", targetHandle: "in" },
+  e8: { id: "e8", source: "conv4", sourceHandle: "out", target: "relu4", targetHandle: "in" },
+  e9: { id: "e9", source: "relu4", sourceHandle: "out", target: "pool2", targetHandle: "in" },
+  e10: { id: "e10", source: "pool2", sourceHandle: "out", target: "flatten_1", targetHandle: "in" },
+  e11: { id: "e11", source: "flatten_1", sourceHandle: "out", target: "fc1", targetHandle: "in" },
+  e12: { id: "e12", source: "fc1", sourceHandle: "out", target: "relu5", targetHandle: "in" },
+  e13: { id: "e13", source: "relu5", sourceHandle: "out", target: "dropout1", targetHandle: "in" },
+  e14: { id: "e14", source: "dropout1", sourceHandle: "out", target: "fc2", targetHandle: "in" },
+  e15: { id: "e15", source: "fc2", sourceHandle: "out", target: "relu6", targetHandle: "in" },
+  e16: { id: "e16", source: "relu6", sourceHandle: "out", target: "dropout2", targetHandle: "in" },
+  e17: { id: "e17", source: "dropout2", sourceHandle: "out", target: "fc3", targetHandle: "in" },
+  e18: { id: "e18", source: "fc3", sourceHandle: "out", target: "output_1", targetHandle: "in" },
+};
+
+const VGG_BLOCK_ORDER = [
+  "input_1", "conv1", "relu1", "conv2", "relu2", "pool1",
+  "conv3", "relu3", "conv4", "relu4", "pool2", "flatten_1",
+  "fc1", "relu5", "dropout1", "fc2", "relu6", "dropout2", "fc3", "output_1",
+] as const;
+
+const VGG_ALL_EDGES = Object.values(VGG_EDGES);
+
+function vggGraphUpToBlock(index: number) {
+  const nodeIds = new Set(VGG_BLOCK_ORDER.slice(0, index + 1));
+  const nodes = VGG_BLOCK_ORDER.slice(0, index + 1).map((id) => VGG_NODES[id]);
+  const edges = VGG_ALL_EDGES.filter((e) => nodeIds.has(e.source as typeof VGG_BLOCK_ORDER[number]) && nodeIds.has(e.target as typeof VGG_BLOCK_ORDER[number]));
+  return { nodes, edges };
+}
+
+const VGG_BLOCK_TITLES: Record<typeof VGG_BLOCK_ORDER[number], string> = {
+  input_1: "Input",
+  conv1: "Conv2D (64 filters, 3×3)",
+  relu1: "ReLU",
+  conv2: "Conv2D (64 filters, 3×3)",
+  relu2: "ReLU",
+  pool1: "MaxPool2D (2×2)",
+  conv3: "Conv2D (128 filters, 3×3)",
+  relu3: "ReLU",
+  conv4: "Conv2D (128 filters, 3×3)",
+  relu4: "ReLU",
+  pool2: "MaxPool2D (2×2)",
+  flatten_1: "Flatten",
+  fc1: "Linear (6272 → 4096)",
+  relu5: "ReLU",
+  dropout1: "Dropout (0.5)",
+  fc2: "Linear (4096 → 4096)",
+  relu6: "ReLU",
+  dropout2: "Dropout (0.5)",
+  fc3: "Linear (4096 → 1000)",
+  output_1: "Output",
+};
+
+const VGG_BLOCK_DESCRIPTIONS: Record<typeof VGG_BLOCK_ORDER[number], string> = {
+  input_1: "Raw image input. VGG was designed for 224×224 RGB ImageNet; we use smaller input (e.g. 28×28) here; the architecture is the same.",
+  conv1: "First 3×3 conv: 64 filters, padding 1. VGG uses only 3×3 convs; stacking them gives a large effective receptive field with fewer parameters than one 7×7.",
+  relu1: "ReLU after the first conv.",
+  conv2: "Second 3×3 in the block: 64 filters. Two conv layers before pooling is the standard VGG block.",
+  relu2: "ReLU after conv2. Then max pooling halves the spatial size.",
+  pool1: "2×2 MaxPool, stride 2. Reduces spatial dimensions. VGG-16 has five such pooling layers; here we use two blocks.",
+  conv3: "First conv of block 2: 128 filters, 3×3. Channel count doubles after each pool in VGG.",
+  relu3: "ReLU after conv3.",
+  conv4: "Second 3×3 in block 2: 128 filters. Then pool and flatten.",
+  relu4: "ReLU after conv4.",
+  pool2: "Second 2×2 MaxPool. Output is 7×7×128 (for 28×28 input) before flatten.",
+  flatten_1: "Flattens 7×7×128 = 6272 into a vector for the classifier.",
+  fc1: "First FC: 6272 → 4096. VGG-16 has three FC layers; the first two are 4096-d with dropout.",
+  relu5: "ReLU after FC1.",
+  dropout1: "Dropout 0.5 to reduce overfitting on the large FC layers.",
+  fc2: "Second FC: 4096 → 4096. Same size; again with ReLU and dropout.",
+  relu6: "ReLU after FC2.",
+  dropout2: "Dropout before the classifier.",
+  fc3: "Classifier: 4096 → 1000. Outputs ImageNet class logits.",
+  output_1: "Output logits for 1000 classes.",
+};
+
+const VGG_QUIZ_DISTRACTORS = ["BatchNorm", "LayerNorm", "Softmax", "Another Conv2D (1×1)"];
+
+function vggChoicesForStep(stepIndex: number): string[] {
+  if (stepIndex >= VGG_BLOCK_ORDER.length - 1) return [];
+  const correct = VGG_BLOCK_TITLES[VGG_BLOCK_ORDER[stepIndex + 1]];
+  const wrong = VGG_BLOCK_ORDER.filter((_, i) => i !== stepIndex + 1).map((id) => VGG_BLOCK_TITLES[id]);
+  const pool = [...VGG_QUIZ_DISTRACTORS, ...wrong].filter((t) => t !== correct);
+  return [correct, ...pool.slice(0, 3)];
+}
+
+export const VGG_WALKTHROUGH_STEPS: WalkthroughStep[] = VGG_BLOCK_ORDER.map((blockId, index) => {
+  const { nodes, edges } = vggGraphUpToBlock(index);
+  const isLast = index === VGG_BLOCK_ORDER.length - 1;
+  return {
+    title: VGG_BLOCK_TITLES[blockId],
+    description: VGG_BLOCK_DESCRIPTIONS[blockId],
+    ...(!isLast && {
+      nextQuestion: "What layer should come next?",
+      correctNext: VGG_BLOCK_TITLES[VGG_BLOCK_ORDER[index + 1]],
+      nextChoices: vggChoicesForStep(index),
+    }),
+    graph: { ...VGG_STEP_META, nodes, edges },
+  };
+});
+
 /** Walkthrough config by level number (papers only). */
 export const PAPER_WALKTHROUGHS: Record<number, WalkthroughStep[]> = {
   7: TRANSFORMER_WALKTHROUGH_STEPS,
@@ -675,5 +926,7 @@ export const PAPER_WALKTHROUGHS: Record<number, WalkthroughStep[]> = {
   9: RESNET_WALKTHROUGH_STEPS,
   10: BERT_WALKTHROUGH_STEPS,
   11: GPT_WALKTHROUGH_STEPS,
+  12: LENET5_WALKTHROUGH_STEPS,
+  13: VGG_WALKTHROUGH_STEPS,
 };
 
