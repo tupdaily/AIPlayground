@@ -2,12 +2,12 @@
 
 import { memo, useEffect, useState, useMemo } from "react";
 import type { Node, NodeProps } from "@xyflow/react";
-import { useReactFlow } from "@xyflow/react";
+import { useReactFlow, useEdges } from "@xyflow/react";
 import { BaseBlock } from "./BaseBlock";
 import { useShapes } from "@/neuralcanvas/components/canvas/ShapeContext";
-import { usePrediction } from "@/neuralcanvas/components/canvas/PredictionContext";
 import { getShapeLabel } from "@/neuralcanvas/lib/shapeEngine";
 import { getClassLabelsForDataset } from "@/neuralcanvas/lib/trainingApi";
+import { getPrediction, subscribe as subscribeToPrediction } from "@/neuralcanvas/lib/predictionStore";
 
 interface BlockData extends Record<string, unknown> {
   params: Record<string, number | string>;
@@ -171,9 +171,18 @@ function DisplayScreen({
 function DisplayBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
   const { shapes } = useShapes();
   const { getNodes } = useReactFlow();
-  const { predictedClassIndex } = usePrediction();
+  const edges = useEdges();
+  // Sync with prediction store (Model block writes via setPrediction; Display reads here)
+  const [predictedClassIndex, setPredictedClassIndex] = useState<number | null>(() => getPrediction());
+  useEffect(() => {
+    const unsub = subscribeToPrediction((classIndex) => setPredictedClassIndex(classIndex));
+    return unsub;
+  }, []);
+
   const result = shapes.get(id);
-  const hasInput = result?.inputShape != null && result.inputShape.length > 0 && !result?.error;
+  const hasIncomingEdge = useMemo(() => edges.some((e) => e.target === id), [edges, id]);
+  const hasInputFromShape = result?.inputShape != null && result.inputShape.length > 0 && !result?.error;
+  const hasInput = hasInputFromShape || hasIncomingEdge;
   const shapeLabel = getShapeLabel(result?.outputShape ?? result?.inputShape ?? null);
   const inputShape = result?.inputShape;
 
@@ -203,10 +212,11 @@ function DisplayBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>
 
   const isClassOutput = inputShape != null && inputShape.length === 2 && classLabels.length > 0;
   const displayLabel = useMemo(() => {
-    if (!isClassOutput || predictedClassIndex == null) return "—";
+    if (predictedClassIndex == null) return "—";
     const idx = Math.floor(Number(predictedClassIndex));
-    if (idx < 0 || idx >= classLabels.length) return "—";
-    return classLabels[idx];
+    if (idx < 0) return "—";
+    if (isClassOutput && idx < classLabels.length) return classLabels[idx];
+    return `Class ${idx}`;
   }, [isClassOutput, predictedClassIndex, classLabels]);
 
   return (
@@ -227,7 +237,7 @@ function DisplayBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>
               <DisplayScreen
                 shapeLabel={shapeLabel}
                 displayLabel={displayLabel}
-                isClassOutput={isClassOutput}
+                isClassOutput={isClassOutput || displayLabel !== "—"}
               />
             ) : (
               <NoSignalScreen />

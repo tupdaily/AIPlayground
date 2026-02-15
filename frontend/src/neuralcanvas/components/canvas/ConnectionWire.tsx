@@ -4,7 +4,7 @@
 // ConnectionWire — v3 Light Theme: clean white pills, colored flow dots
 // ---------------------------------------------------------------------------
 
-import { memo, useState, useMemo } from "react";
+import { memo, useState, useMemo, useEffect } from "react";
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -174,11 +174,22 @@ function ConnectionWireComponent({
     return describeShape(outputShape);
   }, [hasShape, outputShape]);
 
+  const animateIn = !!(data as { animateIn?: boolean })?.animateIn;
+  const [revealComplete, setRevealComplete] = useState(!animateIn);
+  useEffect(() => {
+    if (animateIn) {
+      const t = setTimeout(() => setRevealComplete(true), 550);
+      return () => clearTimeout(t);
+    } else {
+      setRevealComplete(true);
+    }
+  }, [animateIn]);
+  const showFlowDots = wireState === "valid" && revealComplete;
   const s = CANVAS_UI_SCALE * SHAPE_LABEL_SCALE;
 
   return (
     <>
-      {/* Main connection line */}
+      {/* Main connection line — with optional draw-in animation for agent suggestions */}
       <BaseEdge
         path={edgePath}
         markerEnd={markerEnd}
@@ -188,11 +199,15 @@ function ConnectionWireComponent({
           strokeWidth: selected || hovered ? 2.5 : 1.5,
           strokeLinecap: "round",
           transition: "stroke 0.2s ease, stroke-width 0.2s ease",
+          ...(animateIn && {
+            strokeDasharray: 800,
+            animation: "connectionWireReveal 0.5s ease-out forwards",
+          }),
         }}
       />
 
       {/* Animated flow dots on valid connections — short dash + round cap = round dots */}
-      {wireState === "valid" && (
+      {showFlowDots && (
         <path
           d={edgePath}
           fill="none"
@@ -320,6 +335,10 @@ if (typeof document !== "undefined") {
     @keyframes connectionDotFlow {
       0%   { stroke-dashoffset: 0; }
       100% { stroke-dashoffset: -${PERIOD}; }
+    }
+    @keyframes connectionWireReveal {
+      from { stroke-dashoffset: 800; }
+      to   { stroke-dashoffset: 0; }
     }
   `;
 }

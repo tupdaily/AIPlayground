@@ -452,6 +452,12 @@ function computeBlockShape(
       return { outputShape: null }; // Sink — no downstream shape.
     }
 
+    // ----- Model (inference: accepts data input, passes through to Display) -----
+    case "Model": {
+      if (!inputShape) return { outputShape: null, error: "No input connected." };
+      return { outputShape: [...inputShape] }; // Pass through so Model → Display gets shape.
+    }
+
     // ----- Embedding -----
     case "Embedding": {
       if (!inputShape) return { outputShape: null, error: "No input connected." };
@@ -878,9 +884,10 @@ export function validateConnection(
     case "TextInput":
       return { valid: true };
 
-    // Output and Display accept any shape.
+    // Output, Display, and Model accept any shape.
     case "Output":
     case "Display":
+    case "Model":
       return { valid: true };
 
     // Add: two inputs (same shape enforced at runtime). Concat: two+ inputs.

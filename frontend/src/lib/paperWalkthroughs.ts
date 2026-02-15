@@ -293,28 +293,33 @@ const RESNET_STEP_META = {
   },
 };
 
+// Same hardcoded layout as seed-levels ResNet: three rows, 420px horizontal, large vertical gaps.
+const R_SKIP_Y = 60;
+const R_STEM_Y = 280;
+const R_BRANCH_Y = 520;
+const R_X = (i: number) => 80 + i * 420;
 const RESNET_NODES = {
-  input_1: { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
-  conv1: { id: "conv1", type: "conv2d", params: { in_channels: 1, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 200, y: 200 } },
-  bn1: { id: "bn1", type: "batchnorm", params: { num_features: 64 }, position: { x: 320, y: 200 } },
-  relu1: { id: "relu1", type: "activation", params: { activation: "relu" }, position: { x: 440, y: 200 } },
-  conv2a: { id: "conv2a", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 560, y: 200 } },
-  bn2a: { id: "bn2a", type: "batchnorm", params: { num_features: 64 }, position: { x: 680, y: 200 } },
-  relu2a: { id: "relu2a", type: "activation", params: { activation: "relu" }, position: { x: 800, y: 200 } },
-  conv2b: { id: "conv2b", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 920, y: 200 } },
-  bn2b: { id: "bn2b", type: "batchnorm", params: { num_features: 64 }, position: { x: 1040, y: 200 } },
-  add1: { id: "add1", type: "add", params: {}, position: { x: 1160, y: 200 } },
-  relu2b: { id: "relu2b", type: "activation", params: { activation: "relu" }, position: { x: 1280, y: 200 } },
-  conv3a: { id: "conv3a", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 1400, y: 200 } },
-  bn3a: { id: "bn3a", type: "batchnorm", params: { num_features: 64 }, position: { x: 1520, y: 200 } },
-  relu3a: { id: "relu3a", type: "activation", params: { activation: "relu" }, position: { x: 1640, y: 200 } },
-  conv3b: { id: "conv3b", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 1760, y: 200 } },
-  bn3b: { id: "bn3b", type: "batchnorm", params: { num_features: 64 }, position: { x: 1880, y: 200 } },
-  add2: { id: "add2", type: "add", params: {}, position: { x: 2000, y: 200 } },
-  relu3b: { id: "relu3b", type: "activation", params: { activation: "relu" }, position: { x: 2120, y: 200 } },
-  flatten_1: { id: "flatten_1", type: "flatten", params: {}, position: { x: 2240, y: 200 } },
-  fc: { id: "fc", type: "linear", params: { in_features: 50176, out_features: 10 }, position: { x: 2360, y: 200 } },
-  output_1: { id: "output_1", type: "output", params: {}, position: { x: 2480, y: 200 } },
+  input_1: { id: "input_1", type: "input", params: {}, position: { x: R_X(0), y: R_STEM_Y } },
+  conv1: { id: "conv1", type: "conv2d", params: { in_channels: 1, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: R_X(1), y: R_STEM_Y } },
+  bn1: { id: "bn1", type: "batchnorm", params: { num_features: 64 }, position: { x: R_X(2), y: R_STEM_Y } },
+  relu1: { id: "relu1", type: "activation", params: { activation: "relu" }, position: { x: R_X(3), y: R_STEM_Y } },
+  conv2a: { id: "conv2a", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: R_X(4), y: R_BRANCH_Y } },
+  bn2a: { id: "bn2a", type: "batchnorm", params: { num_features: 64 }, position: { x: R_X(5), y: R_BRANCH_Y } },
+  relu2a: { id: "relu2a", type: "activation", params: { activation: "relu" }, position: { x: R_X(6), y: R_BRANCH_Y } },
+  conv2b: { id: "conv2b", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: R_X(7), y: R_BRANCH_Y } },
+  bn2b: { id: "bn2b", type: "batchnorm", params: { num_features: 64 }, position: { x: R_X(8), y: R_BRANCH_Y } },
+  add1: { id: "add1", type: "add", params: {}, position: { x: R_X(9), y: R_SKIP_Y } },
+  relu2b: { id: "relu2b", type: "activation", params: { activation: "relu" }, position: { x: R_X(10), y: R_SKIP_Y } },
+  conv3a: { id: "conv3a", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: R_X(11), y: R_BRANCH_Y } },
+  bn3a: { id: "bn3a", type: "batchnorm", params: { num_features: 64 }, position: { x: R_X(12), y: R_BRANCH_Y } },
+  relu3a: { id: "relu3a", type: "activation", params: { activation: "relu" }, position: { x: R_X(13), y: R_BRANCH_Y } },
+  conv3b: { id: "conv3b", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: R_X(14), y: R_BRANCH_Y } },
+  bn3b: { id: "bn3b", type: "batchnorm", params: { num_features: 64 }, position: { x: R_X(15), y: R_BRANCH_Y } },
+  add2: { id: "add2", type: "add", params: {}, position: { x: R_X(16), y: R_SKIP_Y } },
+  relu3b: { id: "relu3b", type: "activation", params: { activation: "relu" }, position: { x: R_X(17), y: R_SKIP_Y } },
+  flatten_1: { id: "flatten_1", type: "flatten", params: {}, position: { x: R_X(18), y: R_SKIP_Y } },
+  fc: { id: "fc", type: "linear", params: { in_features: 50176, out_features: 10 }, position: { x: R_X(19), y: R_SKIP_Y } },
+  output_1: { id: "output_1", type: "output", params: {}, position: { x: R_X(20), y: R_SKIP_Y } },
 };
 
 const RESNET_EDGES = {
@@ -561,20 +566,27 @@ const GPT_STEP_META = {
   },
 };
 
+// Hardcoded staggered layout: large horizontal (440px) and vertical gaps so no lines are obscured.
+const GPT_DX = 440;
+const GPT_Y_UP = 100;    // upper row: embed, ln_pre, add_1, linear_1, linear_2, ln_post
+const GPT_Y_DOWN = 380;  // middle row: input, attn, gelu_1, add_2
+const GPT_Y_POS_EMBED = -100; // positional embedding above the others
+const GPT_Y_LN_MID = 700; // 7th block (ln_mid) well below add_2 so wire connects up to bottom of Add
+const GPT_Y_OUTPUT = 60;
 const GPT_NODES = {
-  text_input_1: { id: "text_input_1", type: "text_input", params: { batch_size: 1, seq_len: 128 }, position: { x: 80, y: 380 } },
-  text_embed_1: { id: "text_embed_1", type: "text_embedding", params: { vocab_size: 50257, embedding_dim: 128 }, position: { x: 220, y: 380 } },
-  pos_embed_1: { id: "pos_embed_1", type: "positional_embedding", params: { d_model: 128, max_len: 1024 }, position: { x: 360, y: 380 } },
-  ln_pre: { id: "ln_pre", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 320, y: 280 } },
-  attn: { id: "attn", type: "attention", params: { embed_dim: 128, num_heads: 4 }, position: { x: 460, y: 280 } },
-  add_1: { id: "add_1", type: "add", params: {}, position: { x: 600, y: 280 } },
-  ln_mid: { id: "ln_mid", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 320, y: 180 } },
-  linear_1: { id: "linear_1", type: "linear", params: { in_features: 128, out_features: 512 }, position: { x: 460, y: 180 } },
-  gelu_1: { id: "gelu_1", type: "activation", params: { activation: "gelu" }, position: { x: 540, y: 180 } },
-  linear_2: { id: "linear_2", type: "linear", params: { in_features: 512, out_features: 128 }, position: { x: 620, y: 180 } },
-  add_2: { id: "add_2", type: "add", params: {}, position: { x: 760, y: 180 } },
-  ln_post: { id: "ln_post", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 320, y: 80 } },
-  output_1: { id: "output_1", type: "output", params: {}, position: { x: 460, y: 80 } },
+  text_input_1: { id: "text_input_1", type: "text_input", params: { batch_size: 1, seq_len: 128 }, position: { x: 80, y: GPT_Y_DOWN } },
+  text_embed_1: { id: "text_embed_1", type: "text_embedding", params: { vocab_size: 50257, embedding_dim: 128 }, position: { x: 80 + GPT_DX, y: GPT_Y_UP } },
+  pos_embed_1: { id: "pos_embed_1", type: "positional_embedding", params: { d_model: 128, max_len: 1024 }, position: { x: 80 + GPT_DX * 2, y: GPT_Y_POS_EMBED } },
+  ln_pre: { id: "ln_pre", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 80 + GPT_DX * 3, y: GPT_Y_UP } },
+  attn: { id: "attn", type: "attention", params: { embed_dim: 128, num_heads: 4 }, position: { x: 80 + GPT_DX * 4, y: GPT_Y_DOWN } },
+  add_1: { id: "add_1", type: "add", params: {}, position: { x: 80 + GPT_DX * 5, y: GPT_Y_UP } },
+  ln_mid: { id: "ln_mid", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 80 + GPT_DX * 6, y: GPT_Y_LN_MID } },
+  linear_1: { id: "linear_1", type: "linear", params: { in_features: 128, out_features: 512 }, position: { x: 80 + GPT_DX * 7, y: GPT_Y_UP } },
+  gelu_1: { id: "gelu_1", type: "activation", params: { activation: "gelu" }, position: { x: 80 + GPT_DX * 8, y: GPT_Y_DOWN } },
+  linear_2: { id: "linear_2", type: "linear", params: { in_features: 512, out_features: 128 }, position: { x: 80 + GPT_DX * 9, y: GPT_Y_UP } },
+  add_2: { id: "add_2", type: "add", params: {}, position: { x: 80 + GPT_DX * 10, y: GPT_Y_DOWN } },
+  ln_post: { id: "ln_post", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 80 + GPT_DX * 11, y: GPT_Y_UP } },
+  output_1: { id: "output_1", type: "output", params: {}, position: { x: 80 + GPT_DX * 12, y: GPT_Y_OUTPUT } },
 };
 
 const GPT_EDGES = {
@@ -586,10 +598,10 @@ const GPT_EDGES = {
   e4: { id: "e4", source: "attn", sourceHandle: "out", target: "add_1", targetHandle: "in_b" },
   e5: { id: "e5", source: "add_1", sourceHandle: "out", target: "ln_mid", targetHandle: "in" },
   e6: { id: "e6", source: "ln_mid", sourceHandle: "out", target: "linear_1", targetHandle: "in" },
-  e7: { id: "e7", source: "ln_mid", sourceHandle: "out", target: "add_2", targetHandle: "in_a" },
+  e7: { id: "e7", source: "ln_mid", sourceHandle: "out", target: "add_2", targetHandle: "in_b" },
   e8: { id: "e8", source: "linear_1", sourceHandle: "out", target: "gelu_1", targetHandle: "in" },
   e9: { id: "e9", source: "gelu_1", sourceHandle: "out", target: "linear_2", targetHandle: "in" },
-  e10: { id: "e10", source: "linear_2", sourceHandle: "out", target: "add_2", targetHandle: "in_b" },
+  e10: { id: "e10", source: "linear_2", sourceHandle: "out", target: "add_2", targetHandle: "in_a" },
   e11: { id: "e11", source: "add_2", sourceHandle: "out", target: "ln_post", targetHandle: "in" },
   e12: { id: "e12", source: "ln_post", sourceHandle: "out", target: "output_1", targetHandle: "in" },
 };
@@ -1229,15 +1241,15 @@ export const T5_WALKTHROUGH_STEPS: WalkthroughStep[] = T5_BLOCK_ORDER.map((block
   };
 });
 
-/** Walkthrough config by level number (papers only). */
+/** Walkthrough config by level number (papers only). Must match level_number in seed-levels.ts. */
 export const PAPER_WALKTHROUGHS: Record<number, WalkthroughStep[]> = {
-  7: TRANSFORMER_WALKTHROUGH_STEPS,
-  8: ALEXNET_WALKTHROUGH_STEPS,
-  9: RESNET_WALKTHROUGH_STEPS,
-  10: BERT_WALKTHROUGH_STEPS,
-  11: GPT_WALKTHROUGH_STEPS,
-  12: LENET5_WALKTHROUGH_STEPS,
-  13: VGG_WALKTHROUGH_STEPS,
+  10: TRANSFORMER_WALKTHROUGH_STEPS,
+  11: ALEXNET_WALKTHROUGH_STEPS,
+  12: RESNET_WALKTHROUGH_STEPS,
+  13: BERT_WALKTHROUGH_STEPS,
+  14: GPT_WALKTHROUGH_STEPS,
+  15: LENET5_WALKTHROUGH_STEPS,
+  16: VGG_WALKTHROUGH_STEPS,
   17: INCEPTION_WALKTHROUGH_STEPS,
   18: T5_WALKTHROUGH_STEPS,
 };

@@ -27,3 +27,4 @@ export { SoftmaxBlock } from "./SoftmaxBlock";
 export { AddBlock } from "./AddBlock";
 export { ConcatBlock } from "./ConcatBlock";
 export { AugmentBlock } from "./AugmentBlock";
+export { ModelBlock } from "./ModelBlock";

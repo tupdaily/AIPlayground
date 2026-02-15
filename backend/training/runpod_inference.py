@@ -86,7 +86,9 @@ async def infer_model_flash(
         with torch.no_grad():
             output = model(input_tensor_torch)
 
-        # Convert to list
+        # Ensure 2D for API contract [batch_size, num_classes]
+        if output.dim() == 1:
+            output = output.unsqueeze(0)
         output_list = output.cpu().numpy().tolist()
         output_shape = list(output.shape)
 

@@ -378,6 +378,12 @@ html[data-theme="dark"] .react-flow__minimap-mask {
   50%      { transform: translateY(-6px); }
 }
 
+@keyframes thinking-dot {
+  0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+  40%           { transform: scale(1.2); opacity: 1; }
+}
+
+.animate-thinking-dot { animation: thinking-dot 1s ease-in-out infinite; }
 .animate-shake      { animation: shake 0.4s ease-in-out; }
 .animate-fade-in    { animation: fadeIn 0.3s ease-out; }
 .animate-slide-up   { animation: slideUp 0.4s ease-out; }
@@ -430,4 +436,20 @@ html[data-theme="dark"] .glass {
 .block-card:hover,
 .block-card.selected {
   box-shadow: var(--shadow-card-hover);
+}
+
+/* Agent-suggested blocks: soft accent ring and subtle pulse */
+.react-flow__node.agent-suggested-node {
+  animation: agent-suggested-glow 2.5s ease-in-out 2;
+}
+.react-flow__node.agent-suggested-node > div {
+  box-shadow: 0 0 0 2px var(--accent-strong), var(--shadow-card);
+}
+@keyframes agent-suggested-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px var(--accent-muted));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px var(--accent-strong));
+  }
 }

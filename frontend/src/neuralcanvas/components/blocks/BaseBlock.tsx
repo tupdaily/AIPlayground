@@ -53,6 +53,7 @@ import {
   Monitor,
   PenTool,
   Sparkles,
+  Cpu,
   type LucideIcon,
 } from "lucide-react";
 
@@ -82,6 +83,7 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   monitor: Monitor,
   "pen-tool": PenTool,
   sparkles: Sparkles,
+  cpu: Cpu,
 };
 
 // ---------------------------------------------------------------------------
@@ -572,16 +574,19 @@ function BaseBlockComponent({
     </div>
   );
 
-  // Opacity-only animation: avoids translateX/translateY which would shift handles
+  // Opacity + scale animation: avoids translateX/translateY which would shift handles
   // during animation and break React Flow's cached handle positions (connections
-  // would stop short of the visible handle circles).
+  // would stop short of the visible handle circles). Scale provides a polished pop-in.
   if (animateFromPalette) {
     return (
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        style={{ width: "100%" }}
+        initial={{ opacity: 0, scale: 0.88 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{
+          duration: 0.55,
+          ease: [0.25, 0.46, 0.45, 0.94],
+        }}
+        style={{ width: "100%", transformOrigin: "center center" }}
       >
         {blockContent}
       </motion.div>

@@ -45,6 +45,7 @@ import {
   Star,
   Minimize2,
   Sparkles,
+  Cpu,
   type LucideIcon,
 } from "lucide-react";
 
@@ -73,6 +74,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   monitor: Monitor,
   "pen-tool": PenTool,
   sparkles: Sparkles,
+  cpu: Cpu,
 };
 
 const CATEGORIES: {
@@ -128,6 +130,7 @@ const FRIENDLY_DESCRIPTIONS: Record<string, string> = {
   Add: "Combines two paths together (residual connection)",
   Concat: "Joins two data streams side by side",
   Augment: "Transforms image data from Input only (rotate, flip, brightness). Connect Input → Augment. Click the eye to preview.",
+  Model: "Run inference with a trained model. Connect Board or Input Space → Model → Display to see predictions.",
 };
 
 // ---------------------------------------------------------------------------

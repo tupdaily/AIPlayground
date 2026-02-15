@@ -42,6 +42,7 @@ import {
 import { validateConnection, inferInputParamsFromShape } from "@/neuralcanvas/lib/shapeEngine";
 import { ShapeProvider, useShapes } from "./ShapeContext";
 import { PredictionProvider } from "./PredictionContext";
+import { PlaygroundIdProvider } from "./PlaygroundIdContext";
 import { ConnectionWire } from "./ConnectionWire";
 import { BlockPalette, DRAG_BLOCK_TYPE } from "./BlockPalette";
 import { useUndoRedo } from "@/neuralcanvas/hooks/useUndoRedo";
@@ -90,6 +91,7 @@ import {
   AddBlock,
   ConcatBlock,
   AugmentBlock,
+  ModelBlock,
 } from "@/neuralcanvas/components/blocks";
 
 // ---------------------------------------------------------------------------
@@ -164,6 +166,7 @@ const nodeTypes: NodeTypes = {
   Add: AddBlock,
   Concat: ConcatBlock,
   Augment: AugmentBlock,
+  Model: ModelBlock,
   [CHALLENGE_TASK_NODE_TYPE]: ChallengeTaskNode,
 };
 
@@ -237,6 +240,16 @@ const INITIAL_EDGES: Edge[] = [
   { id: "e-6", source: "softmax-1", target: "output-1", type: "shape" },
 ];
 
+/** Returns a node id that is unique among existing nodes (avoids duplicate React keys). */
+function getUniqueNodeId(existingNodes: Node[], blockType: string): string {
+  const used = new Set(existingNodes.map((n) => n.id));
+  for (let i = 1; i < 100_000; i++) {
+    const id = `${blockType}-${i}`;
+    if (!used.has(id)) return id;
+  }
+  return `${blockType}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Inner canvas (needs to be inside ReactFlowProvider via ShapeProvider)
 // ---------------------------------------------------------------------------
@@ -283,7 +296,6 @@ function CanvasInner({
   const [userId, setUserId] = useState<string | undefined>();
   const [effectivePlaygroundId, setEffectivePlaygroundId] = useState<string | undefined>(playgroundId);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const idCounter = useRef(100);
   const reactFlowInstance = useReactFlow();
   const suggestionAnimationRef = useRef<{
     newNodes: Node[];
@@ -346,10 +358,14 @@ function CanvasInner({
       const nodesToAdd = [...layerIds]
         .map((id: string) => pending.newNodes.find((n: Node) => n.id === id))
         .filter((n): n is Node => !!n)
-        .map((n) => ({ ...n, data: { ...n.data, animateFromPalette: true } }));
-      const edgesToAdd = pending.newEdges.filter(
-        (e) => layerIds.has(e.target) && placedIds.has(e.source)
-      );
+        .map((n) => ({
+          ...n,
+          className: "agent-suggested-node",
+          data: { ...n.data, animateFromPalette: true },
+        }));
+      const edgesToAdd = pending.newEdges
+        .filter((e) => layerIds.has(e.target) && placedIds.has(e.source))
+        .map((e) => ({ ...e, data: { ...e.data, animateIn: true } }));
       // On first layer: clear any existing suggestion (gen-*) to avoid duplicate keys when two networks coexist.
       // Add nodes first so React Flow can measure them before computing edge paths.
       const isFirstLayer = layerIndex === 0;
@@ -377,13 +393,24 @@ function CanvasInner({
       } else {
         suggestionAnimationRef.current = null;
         setSuggestionAnimationTrigger(null);
+        // Smoothly pan/zoom to show the new suggestion (don't add to timeouts so it still runs after cleanup)
+        const suggestedNodeRefs = pending.newNodes.map((n) => ({ id: n.id }));
+        setTimeout(() => {
+          try {
+            reactFlowInstance.fitView({
+              nodes: suggestedNodeRefs,
+              padding: 0.4,
+              duration: 400,
+            });
+          } catch (_) {}
+        }, 150);
       }
     };
 
     const t = setTimeout(scheduleNext, 320);
     timeouts.push(t);
     return () => timeouts.forEach((id) => clearTimeout(id));
-  }, [suggestionAnimationTrigger, setNodes, setEdges]);
+  }, [suggestionAnimationTrigger, setNodes, setEdges, reactFlowInstance]);
 
   // ── Drag-and-drop from palette ──
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -410,7 +437,7 @@ function CanvasInner({
       takeSnapshot(nodes, edges);
 
       const newNode: Node = {
-        id: `${blockType}-${idCounter.current++}`,
+        id: getUniqueNodeId(nodes, blockType),
         type: blockType,
         position,
         data: { params: getBlockDefaults(blockType) },
@@ -555,7 +582,7 @@ function CanvasInner({
     const selected = nodes.find((n) => n.selected);
     if (!selected) return;
     takeSnapshot(nodes, edges);
-    const newId = `${selected.type}-${idCounter.current++}`;
+    const newId = getUniqueNodeId(nodes, selected.type as string);
     const clone: Node = {
       ...structuredClone(selected),
       id: newId,
@@ -902,6 +929,7 @@ function CanvasInner({
 
   return (
     <SuggestionContext.Provider value={suggestionContextValue}>
+    <PlaygroundIdProvider playgroundId={effectivePlaygroundId}>
     <div className="flex w-full h-full">
       {/* ── Block Palette ── */}
       <BlockPalette />
@@ -981,20 +1009,20 @@ function CanvasInner({
             color="var(--border-strong)"
           />
           <Controls
-            className="!bg-[var(--surface)] !border-[var(--border)] !rounded-xl !shadow-md"
+            className="!bg-[var(--surface)] !border-[var(--border)] !rounded-xl !shadow-md !bottom-[60px]"
             showInteractive={false}
           />
           <MiniMap
             nodeColor={minimapNodeColor}
             maskColor="var(--background)"
-            className="!bg-[var(--surface)] !border-[var(--border)] !rounded-xl !shadow-md"
+            className="!bg-[var(--surface)] !border-[var(--border)] !rounded-xl !shadow-md !bottom-[60px]"
             pannable
             zoomable
           />
         </ReactFlow>
 
         {/* ── Top-right toolbar ── */}
-        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        <div className="absolute top-4 right-4 z-20 flex flex-nowrap items-center gap-2">
         <ThemeToggle />
         {challengeSolutionGraph && !isPaperLevel && (
           <SubmitChallengeButton
@@ -1009,15 +1037,21 @@ function CanvasInner({
           disabled={!(isPaperLevel && paperLevelNumber != null && paperStepIndex != null) && nodes.length === 0}
         />
         {challengeLevelNumber == null && (
-          <div className="relative">
+          <div className="relative inline-flex flex-nowrap items-center gap-2">
             <TrainingToggle
               open={trainingPanelOpen}
-              onToggle={() => setTrainingPanelOpen((o) => !o)}
+              onToggle={() => {
+                setInferencePanelOpen(false);
+                setTrainingPanelOpen((o) => !o);
+              }}
             />
             {effectivePlaygroundId && (
               <InferenceToggle
                 open={inferencePanelOpen}
-                onToggle={() => setInferencePanelOpen((o) => !o)}
+                onToggle={() => {
+                  setTrainingPanelOpen(false);
+                  setInferencePanelOpen((o) => !o);
+                }}
               />
             )}
             <TrainingPanel
@@ -1058,9 +1092,13 @@ function CanvasInner({
       {/* ── Peep Inside Modal ── */}
       <PeepInsideOverlay />
     </div>
+    </PlaygroundIdProvider>
     </SuggestionContext.Provider>
   );
 }
+
+const CHAT_BAR_MIN_HEIGHT = 120;
+const CHAT_BAR_DEFAULT_HEIGHT = 140;
 
 // ── Bottom chat bar (design feedback) ──
 function ChatBar({
@@ -1081,7 +1119,34 @@ function ChatBar({
   onClose: () => void;
 }) {
   const [input, setInput] = useState("");
+  const [openHeight, setOpenHeight] = useState(CHAT_BAR_DEFAULT_HEIGHT);
+  const [isResizing, setIsResizing] = useState(false);
   const suggestionCtx = React.useContext(SuggestionContext);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const onMouseMove = (e: MouseEvent) => {
+      const maxH = Math.round(0.9 * window.innerHeight);
+      const newH = window.innerHeight - e.clientY;
+      setOpenHeight(Math.min(maxH, Math.max(CHAT_BAR_MIN_HEIGHT, newH)));
+    };
+    const onMouseUp = () => setIsResizing(false);
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [isResizing]);
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent) => {
@@ -1106,9 +1171,20 @@ function ChatBar({
 
   return (
     <div
-      className="absolute left-0 right-0 bottom-0 z-40 flex flex-col bg-[var(--surface)]/95 backdrop-blur-md border-t border-[var(--border)] shadow-[0_-4px_24px_rgba(0,0,0,0.08)] transition-[height] duration-300 ease-out"
-      style={{ height: open ? "min(36vh, 280px)" : "52px" }}
+      className={`absolute left-0 right-0 bottom-0 z-40 flex flex-col bg-[var(--surface)]/95 backdrop-blur-md border-t border-[var(--border)] shadow-[0_-4px_24px_rgba(0,0,0,0.08)] ${isResizing ? "" : "transition-[height] duration-300 ease-out"}`}
+      style={{ height: open ? `${openHeight}px` : "52px" }}
     >
+      {/* Resize handle: drag to move panel up (shrink) or down (expand); at max can move down to expose zoom controls */}
+      {open && (
+        <div
+          role="separator"
+          aria-label="Resize design feedback panel"
+          onMouseDown={handleResizeStart}
+          className="h-3 flex-shrink-0 cursor-n-resize hover:bg-[var(--surface-hover)]/80 active:bg-[var(--surface-hover)] flex items-center justify-center group touch-none"
+        >
+          <div className="w-14 h-1 rounded-full bg-[var(--border)] group-hover:bg-[var(--foreground-muted)] transition-colors pointer-events-none" />
+        </div>
+      )}
       {/* Header bar: click to open when collapsed, or show close when open */}
       {open ? (
         <div className="flex items-center justify-between w-full h-[52px] px-4 shrink-0">
@@ -1198,14 +1274,22 @@ function ChatBar({
             )}
             {loading && (
               <div className="flex justify-start">
-                <div className="max-w-[65%] px-3 py-2 rounded-2xl rounded-bl-md bg-[var(--surface-elevated)] text-xs text-[var(--foreground-muted)] flex items-center gap-2">
-                  <span className="animate-pulse">Thinking...</span>
+                <div className="max-w-[65%] px-3 py-2.5 rounded-2xl rounded-bl-md bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--foreground-muted)] flex items-center gap-2.5">
+                  <span className="flex gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-thinking-dot" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-thinking-dot" style={{ animationDelay: "160ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-thinking-dot" style={{ animationDelay: "320ms" }} />
+                  </span>
+                  <span>Designing your model...</span>
                 </div>
               </div>
             )}
             {suggestionCtx?.pendingSuggestionIds?.length && (
-              <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-xl bg-[var(--accent-muted)]/50 border border-[var(--accent)]/40">
-                <span className="text-xs font-medium text-[var(--foreground)]">Suggested architecture added to canvas</span>
+              <div className="flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-[var(--accent-muted)]/60 border border-[var(--accent)]/50 shadow-sm">
+                <span className="text-xs font-medium text-[var(--foreground)] flex items-center gap-2">
+                  <span className="flex h-1.5 w-1.5 rounded-full bg-[var(--success)] animate-pulse" />
+                  Suggested architecture added to canvas
+                </span>
                 <div className="flex gap-2 shrink-0">
                   <button
                     type="button"

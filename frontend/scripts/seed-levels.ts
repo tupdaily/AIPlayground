@@ -185,10 +185,11 @@ const LEVEL_4_SOLUTION: GraphSchema = {
 };
 
 // Level 5: Transformer-style (LayerNorm → Attention → Output). Uses 3D input [B, seq, dim]; Add available for later challenges.
+// Level 5 input must be 3D [batch, seq, features] so LayerNorm → Attention shapes match (Attention expects 3D).
 const LEVEL_5_GRAPH: GraphSchema = {
   version: "1.0",
   nodes: [
-    { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
+    { id: "input_1", type: "input", params: { input_shape: "64,128" }, position: { x: 80, y: 200 } },
     { id: "output_1", type: "output", params: {}, position: { x: 480, y: 200 } },
   ],
   edges: [],
@@ -202,8 +203,8 @@ const LEVEL_5_GRAPH: GraphSchema = {
 const LEVEL_5_SOLUTION: GraphSchema = {
   version: "1.0",
   nodes: [
-    { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
-    { id: "ln1", type: "layernorm", params: {}, position: { x: 200, y: 200 } },
+    { id: "input_1", type: "input", params: { input_shape: "64,128" }, position: { x: 80, y: 200 } },
+    { id: "ln1", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 200, y: 200 } },
     { id: "attn", type: "attention", params: { embed_dim: 128, num_heads: 4 }, position: { x: 320, y: 200 } },
     { id: "output_1", type: "output", params: {}, position: { x: 440, y: 200 } },
   ],
@@ -468,34 +469,38 @@ const ALEXNET_PAPER_GRAPH: GraphSchema = {
 // Paper: Deep Residual Learning for Image Recognition (He et al. — ResNet)
 // ---------------------------------------------------------------------------
 
-const RESNET_SKIP_Y = 100; // elevated y for Add blocks so skip wires are visible
-const RESNET_BRANCH_Y = 280; // lower y for residual branch (conv→bn→relu→conv→bn)
+// Hardcoded vertical rows and horizontal spacing so wires are clearly visible.
+const RESNET_SKIP_Y = 60;    // top row: Add blocks and main flow after residuals
+const RESNET_STEM_Y = 280;   // middle: input → conv → bn → relu (stem)
+const RESNET_BRANCH_Y = 520; // bottom row: residual branch (large gap so skip wires show)
+const RESNET_SPACING = 420;  // horizontal gap between blocks so lines are clearly visible
+const RESNET_X = (i: number) => 80 + i * RESNET_SPACING;
 const RESNET_PAPER_GRAPH: GraphSchema = {
   version: "1.0",
   nodes: [
-    { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
-    { id: "conv1", type: "conv2d", params: { in_channels: 1, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 200, y: 200 } },
-    { id: "bn1", type: "batchnorm", params: {}, position: { x: 320, y: 200 } },
-    { id: "relu1", type: "activation", params: { activation: "relu" }, position: { x: 440, y: 200 } },
-    // Block 1: residual branch lowered; add1 elevated for visible skip
-    { id: "conv2a", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 560, y: RESNET_BRANCH_Y } },
-    { id: "bn2a", type: "batchnorm", params: {}, position: { x: 680, y: RESNET_BRANCH_Y } },
-    { id: "relu2a", type: "activation", params: { activation: "relu" }, position: { x: 800, y: RESNET_BRANCH_Y } },
-    { id: "conv2b", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 920, y: RESNET_BRANCH_Y } },
-    { id: "bn2b", type: "batchnorm", params: {}, position: { x: 1040, y: RESNET_BRANCH_Y } },
-    { id: "add1", type: "add", params: {}, position: { x: 1160, y: RESNET_SKIP_Y } },
-    { id: "relu2b", type: "activation", params: { activation: "relu" }, position: { x: 1280, y: RESNET_SKIP_Y } },
+    { id: "input_1", type: "input", params: {}, position: { x: RESNET_X(0), y: RESNET_STEM_Y } },
+    { id: "conv1", type: "conv2d", params: { in_channels: 1, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: RESNET_X(1), y: RESNET_STEM_Y } },
+    { id: "bn1", type: "batchnorm", params: {}, position: { x: RESNET_X(2), y: RESNET_STEM_Y } },
+    { id: "relu1", type: "activation", params: { activation: "relu" }, position: { x: RESNET_X(3), y: RESNET_STEM_Y } },
+    // Block 1: residual branch on bottom row; add1 on top for long visible skip wires
+    { id: "conv2a", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: RESNET_X(4), y: RESNET_BRANCH_Y } },
+    { id: "bn2a", type: "batchnorm", params: {}, position: { x: RESNET_X(5), y: RESNET_BRANCH_Y } },
+    { id: "relu2a", type: "activation", params: { activation: "relu" }, position: { x: RESNET_X(6), y: RESNET_BRANCH_Y } },
+    { id: "conv2b", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: RESNET_X(7), y: RESNET_BRANCH_Y } },
+    { id: "bn2b", type: "batchnorm", params: {}, position: { x: RESNET_X(8), y: RESNET_BRANCH_Y } },
+    { id: "add1", type: "add", params: {}, position: { x: RESNET_X(9), y: RESNET_SKIP_Y } },
+    { id: "relu2b", type: "activation", params: { activation: "relu" }, position: { x: RESNET_X(10), y: RESNET_SKIP_Y } },
     // Block 2: same pattern
-    { id: "conv3a", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 1400, y: RESNET_BRANCH_Y } },
-    { id: "bn3a", type: "batchnorm", params: {}, position: { x: 1520, y: RESNET_BRANCH_Y } },
-    { id: "relu3a", type: "activation", params: { activation: "relu" }, position: { x: 1640, y: RESNET_BRANCH_Y } },
-    { id: "conv3b", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 1760, y: RESNET_BRANCH_Y } },
-    { id: "bn3b", type: "batchnorm", params: {}, position: { x: 1880, y: RESNET_BRANCH_Y } },
-    { id: "add2", type: "add", params: {}, position: { x: 2000, y: RESNET_SKIP_Y } },
-    { id: "relu3b", type: "activation", params: { activation: "relu" }, position: { x: 2120, y: RESNET_SKIP_Y } },
-    { id: "flatten_1", type: "flatten", params: {}, position: { x: 2240, y: RESNET_SKIP_Y } },
-    { id: "fc", type: "linear", params: { in_features: 50176, out_features: 10 }, position: { x: 2360, y: RESNET_SKIP_Y } },
-    { id: "output_1", type: "output", params: {}, position: { x: 2480, y: RESNET_SKIP_Y } },
+    { id: "conv3a", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: RESNET_X(11), y: RESNET_BRANCH_Y } },
+    { id: "bn3a", type: "batchnorm", params: {}, position: { x: RESNET_X(12), y: RESNET_BRANCH_Y } },
+    { id: "relu3a", type: "activation", params: { activation: "relu" }, position: { x: RESNET_X(13), y: RESNET_BRANCH_Y } },
+    { id: "conv3b", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: RESNET_X(14), y: RESNET_BRANCH_Y } },
+    { id: "bn3b", type: "batchnorm", params: {}, position: { x: RESNET_X(15), y: RESNET_BRANCH_Y } },
+    { id: "add2", type: "add", params: {}, position: { x: RESNET_X(16), y: RESNET_SKIP_Y } },
+    { id: "relu3b", type: "activation", params: { activation: "relu" }, position: { x: RESNET_X(17), y: RESNET_SKIP_Y } },
+    { id: "flatten_1", type: "flatten", params: {}, position: { x: RESNET_X(18), y: RESNET_SKIP_Y } },
+    { id: "fc", type: "linear", params: { in_features: 50176, out_features: 10 }, position: { x: RESNET_X(19), y: RESNET_SKIP_Y } },
+    { id: "output_1", type: "output", params: {}, position: { x: RESNET_X(20), y: RESNET_SKIP_Y } },
   ],
   edges: [
     { id: "e0", source: "input_1", sourceHandle: "out", target: "conv1", targetHandle: "in" },
@@ -576,22 +581,29 @@ const BERT_PAPER_GRAPH: GraphSchema = {
 // Paper: Improving Language Understanding by Generative Pre-Training (GPT)
 // ---------------------------------------------------------------------------
 
+// Staggered layout: 440px horizontal; ln_mid (7th block) on lower row so wires are clear.
+const GPT_DX = 440;
+const GPT_Y_UP = 100;
+const GPT_Y_DOWN = 380;
+const GPT_Y_POS_EMBED = -100; // positional embedding above the others
+const GPT_Y_LN_MID = 700; // 7th block (ln_mid) well below add_2 so wire connects up to bottom of Add
+const GPT_Y_OUTPUT = 60;
 const GPT_PAPER_GRAPH: GraphSchema = {
   version: "1.0",
   nodes: [
-    { id: "text_input_1", type: "text_input", params: { batch_size: 1, seq_len: 128 }, position: { x: 80, y: 380 } },
-    { id: "text_embed_1", type: "text_embedding", params: { vocab_size: 50257, embedding_dim: 128 }, position: { x: 220, y: 380 } },
-    { id: "pos_embed_1", type: "positional_embedding", params: { d_model: 128, max_len: 1024 }, position: { x: 360, y: 380 } },
-    { id: "ln_pre", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 320, y: 300 } },
-    { id: "attn", type: "attention", params: { embed_dim: 128, num_heads: 4 }, position: { x: 460, y: 300 } },
-    { id: "add_1", type: "add", params: {}, position: { x: 600, y: 220 } },
-    { id: "ln_mid", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 320, y: 300 } },
-    { id: "linear_1", type: "linear", params: { in_features: 128, out_features: 512 }, position: { x: 460, y: 300 } },
-    { id: "gelu_1", type: "activation", params: { activation: "gelu" }, position: { x: 540, y: 300 } },
-    { id: "linear_2", type: "linear", params: { in_features: 512, out_features: 128 }, position: { x: 620, y: 300 } },
-    { id: "add_2", type: "add", params: {}, position: { x: 760, y: 120 } },
-    { id: "ln_post", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 320, y: 60 } },
-    { id: "output_1", type: "output", params: {}, position: { x: 460, y: 60 } },
+    { id: "text_input_1", type: "text_input", params: { batch_size: 1, seq_len: 128 }, position: { x: 80, y: GPT_Y_DOWN } },
+    { id: "text_embed_1", type: "text_embedding", params: { vocab_size: 50257, embedding_dim: 128 }, position: { x: 80 + GPT_DX, y: GPT_Y_UP } },
+    { id: "pos_embed_1", type: "positional_embedding", params: { d_model: 128, max_len: 1024 }, position: { x: 80 + GPT_DX * 2, y: GPT_Y_POS_EMBED } },
+    { id: "ln_pre", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 80 + GPT_DX * 3, y: GPT_Y_UP } },
+    { id: "attn", type: "attention", params: { embed_dim: 128, num_heads: 4 }, position: { x: 80 + GPT_DX * 4, y: GPT_Y_DOWN } },
+    { id: "add_1", type: "add", params: {}, position: { x: 80 + GPT_DX * 5, y: GPT_Y_UP } },
+    { id: "ln_mid", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 80 + GPT_DX * 6, y: GPT_Y_LN_MID } },
+    { id: "linear_1", type: "linear", params: { in_features: 128, out_features: 512 }, position: { x: 80 + GPT_DX * 7, y: GPT_Y_UP } },
+    { id: "gelu_1", type: "activation", params: { activation: "gelu" }, position: { x: 80 + GPT_DX * 8, y: GPT_Y_DOWN } },
+    { id: "linear_2", type: "linear", params: { in_features: 512, out_features: 128 }, position: { x: 80 + GPT_DX * 9, y: GPT_Y_UP } },
+    { id: "add_2", type: "add", params: {}, position: { x: 80 + GPT_DX * 10, y: GPT_Y_DOWN } },
+    { id: "ln_post", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 80 + GPT_DX * 11, y: GPT_Y_UP } },
+    { id: "output_1", type: "output", params: {}, position: { x: 80 + GPT_DX * 12, y: GPT_Y_OUTPUT } },
   ],
   edges: [
     { id: "e0a", source: "text_input_1", sourceHandle: "out", target: "text_embed_1", targetHandle: "in" },
@@ -602,10 +614,10 @@ const GPT_PAPER_GRAPH: GraphSchema = {
     { id: "e4", source: "attn", sourceHandle: "out", target: "add_1", targetHandle: "in_b" },
     { id: "e5", source: "add_1", sourceHandle: "out", target: "ln_mid", targetHandle: "in" },
     { id: "e6", source: "ln_mid", sourceHandle: "out", target: "linear_1", targetHandle: "in" },
-    { id: "e7", source: "ln_mid", sourceHandle: "out", target: "add_2", targetHandle: "in_a" },
+    { id: "e7", source: "ln_mid", sourceHandle: "out", target: "add_2", targetHandle: "in_b" },
     { id: "e8", source: "linear_1", sourceHandle: "out", target: "gelu_1", targetHandle: "in" },
     { id: "e9", source: "gelu_1", sourceHandle: "out", target: "linear_2", targetHandle: "in" },
-    { id: "e10", source: "linear_2", sourceHandle: "out", target: "add_2", targetHandle: "in_b" },
+    { id: "e10", source: "linear_2", sourceHandle: "out", target: "add_2", targetHandle: "in_a" },
     { id: "e11", source: "add_2", sourceHandle: "out", target: "ln_post", targetHandle: "in" },
     { id: "e12", source: "ln_post", sourceHandle: "out", target: "output_1", targetHandle: "in" },
   ],

@@ -30,10 +30,30 @@ async def run_inference_local(
     try:
         start_time = time.time()
 
-        # Decode model state dict
+        # Decode model state dict and validate before torch.load (avoids opaque EOFError)
         logger.info("Decoding model state dict...")
-        model_bytes = base64.b64decode(model_state_dict_b64)
-        state_dict = torch.load(io.BytesIO(model_bytes), map_location="cpu")
+        if not (model_state_dict_b64 and isinstance(model_state_dict_b64, str)):
+            raise ValueError(
+                "Model state dict is missing or empty. "
+                "The saved model file may not have been uploaded. Re-train and save the model again."
+            )
+        try:
+            model_bytes = base64.b64decode(model_state_dict_b64, validate=True)
+        except Exception as e:
+            raise ValueError("Model state dict is not valid base64") from e
+        if len(model_bytes) < 100:
+            raise ValueError(
+                f"Model state dict is too small ({len(model_bytes)} bytes). "
+                "The stored model may be truncated. Try re-training and saving the model."
+            )
+        try:
+            state_dict = torch.load(io.BytesIO(model_bytes), map_location="cpu", weights_only=True)
+        except EOFError as e:
+            # Truncated/corrupt pickle from storage; surface a clear message instead of raw EOFError
+            raise ValueError(
+                "Model file is truncated or corrupted (invalid pickle). "
+                "Re-train the model and save it again, or choose a different model."
+            ) from e
 
         # Rebuild model from graph
         logger.info("Rebuilding model from graph...")
@@ -55,7 +75,9 @@ async def run_inference_local(
         with torch.no_grad():
             output = model(input_tensor_torch)
 
-        # Convert output to list
+        # Ensure 2D for API contract [batch_size, num_classes]
+        if output.dim() == 1:
+            output = output.unsqueeze(0)
         output_np = output.cpu().numpy().tolist()
 
         inference_time_ms = (time.time() - start_time) * 1000

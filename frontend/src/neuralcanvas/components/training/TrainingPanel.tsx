@@ -72,6 +72,20 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact, pl
   const [showAdvanced, setShowAdvanced] = useState(false);
   const closeWsRef = useRef<(() => void) | null>(null);
 
+  // String state for free typing; sync from config when panel opens
+  const [epochsInput, setEpochsInput] = useState(String(DEFAULT_CONFIG.epochs));
+  const [learningRateInput, setLearningRateInput] = useState(String(DEFAULT_CONFIG.learning_rate));
+  const [batchSizeInput, setBatchSizeInput] = useState(String(DEFAULT_CONFIG.batch_size));
+  const [trainSplitInput, setTrainSplitInput] = useState(String(DEFAULT_CONFIG.train_split));
+  useEffect(() => {
+    if (isOpen) {
+      setEpochsInput(String(config.epochs));
+      setLearningRateInput(String(config.learning_rate));
+      setBatchSizeInput(String(config.batch_size));
+      setTrainSplitInput(String(config.train_split));
+    }
+  }, [isOpen]);
+
   const datasetId = useMemo(() => {
     const inputNode = nodes.find((n) => (n.type as string) === "Input");
     const params = inputNode?.data?.params;
@@ -125,6 +139,30 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact, pl
       setError("Select a dataset on the Input block.");
       return;
     }
+    // Use current input values (with fallbacks) so typing is respected even without blur
+    const epochs = (() => {
+      const n = parseInt(epochsInput.trim(), 10);
+      return !Number.isNaN(n) && n >= 1 && n <= 500 ? n : config.epochs;
+    })();
+    const learning_rate = (() => {
+      const n = parseFloat(learningRateInput.trim());
+      return !Number.isNaN(n) && n >= 1e-5 && n <= 10 ? n : config.learning_rate;
+    })();
+    const batch_size = (() => {
+      const n = parseInt(batchSizeInput.trim(), 10);
+      return !Number.isNaN(n) && n >= 1 ? n : config.batch_size;
+    })();
+    const train_split = (() => {
+      const n = parseFloat(trainSplitInput.trim());
+      return !Number.isNaN(n) && n >= 0.1 && n <= 0.99 ? n : config.train_split;
+    })();
+    const effectiveConfig = { ...config, epochs, learning_rate, batch_size, train_split };
+    setConfig(effectiveConfig);
+    setEpochsInput(String(epochs));
+    setLearningRateInput(String(learning_rate));
+    setBatchSizeInput(String(batch_size));
+    setTrainSplitInput(String(train_split));
+
     setError(null);
     setStatus("starting");
     setMetrics([]);
@@ -132,7 +170,7 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact, pl
     setTotalBatches(undefined);
     setLatestBatch(null);
     try {
-      const { job_id } = await startTraining(graph, datasetId, config);
+      const { job_id } = await startTraining(graph, datasetId, effectiveConfig);
       setJobId(job_id);
       closeWsRef.current = openTrainingWebSocket(
         job_id,
@@ -193,7 +231,7 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact, pl
       setError(e instanceof Error ? e.message : "Failed to start training");
       setStatus("error");
     }
-  }, [graph, graphError, config, datasetId]);
+  }, [graph, graphError, config, datasetId, epochsInput, learningRateInput, batchSizeInput, trainSplitInput]);
 
   const handleStop = useCallback(() => {
     if (jobId) {
@@ -271,7 +309,6 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact, pl
         setSavingSuccess(false);
       }, 3000);
 
-      console.log("Model saved successfully:", result.model_id);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save model");
     } finally {
@@ -347,8 +384,16 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact, pl
               type="number"
               min={1}
               max={500}
-              value={config.epochs}
-              onChange={(e) => setConfig((c) => ({ ...c, epochs: parseInt(e.target.value, 10) || 1 }))}
+              value={epochsInput}
+              onChange={(e) => setEpochsInput(e.target.value)}
+              onBlur={() => {
+                const n = parseInt(epochsInput.trim(), 10);
+                if (!Number.isNaN(n) && n >= 1 && n <= 500) {
+                  setConfig((c) => ({ ...c, epochs: n }));
+                } else {
+                  setEpochsInput(String(config.epochs));
+                }
+              }}
               className={inputClass}
               title={SETTING_HINTS.epochs}
             />
@@ -360,10 +405,18 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact, pl
             </label>
             <input
               type="number"
-              step="0.0001"
+              step="any"
               min={0.00001}
-              value={config.learning_rate}
-              onChange={(e) => setConfig((c) => ({ ...c, learning_rate: parseFloat(e.target.value) || 0.001 }))}
+              value={learningRateInput}
+              onChange={(e) => setLearningRateInput(e.target.value)}
+              onBlur={() => {
+                const n = parseFloat(learningRateInput.trim());
+                if (!Number.isNaN(n) && n >= 1e-5 && n <= 10) {
+                  setConfig((c) => ({ ...c, learning_rate: n }));
+                } else {
+                  setLearningRateInput(String(config.learning_rate));
+                }
+              }}
               className={inputClass}
               title={SETTING_HINTS.learning_rate}
             />
@@ -388,8 +441,16 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact, pl
               <input
                 type="number"
                 min={1}
-                value={config.batch_size}
-                onChange={(e) => setConfig((c) => ({ ...c, batch_size: parseInt(e.target.value, 10) || 1 }))}
+                value={batchSizeInput}
+                onChange={(e) => setBatchSizeInput(e.target.value)}
+                onBlur={() => {
+                  const n = parseInt(batchSizeInput.trim(), 10);
+                  if (!Number.isNaN(n) && n >= 1) {
+                    setConfig((c) => ({ ...c, batch_size: n }));
+                  } else {
+                    setBatchSizeInput(String(config.batch_size));
+                  }
+                }}
                 className={inputClass}
                 title={SETTING_HINTS.batch_size}
               />
@@ -411,11 +472,19 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact, pl
               <label className="block text-xs font-medium text-[var(--foreground-secondary)] mb-1.5">Train / Validation Split</label>
               <input
                 type="number"
-                step="0.05"
+                step="any"
                 min={0.1}
                 max={0.99}
-                value={config.train_split}
-                onChange={(e) => setConfig((c) => ({ ...c, train_split: parseFloat(e.target.value) || 0.8 }))}
+                value={trainSplitInput}
+                onChange={(e) => setTrainSplitInput(e.target.value)}
+                onBlur={() => {
+                  const n = parseFloat(trainSplitInput.trim());
+                  if (!Number.isNaN(n) && n >= 0.1 && n <= 0.99) {
+                    setConfig((c) => ({ ...c, train_split: n }));
+                  } else {
+                    setTrainSplitInput(String(config.train_split));
+                  }
+                }}
                 className={inputClass}
                 title={SETTING_HINTS.train_split}
               />

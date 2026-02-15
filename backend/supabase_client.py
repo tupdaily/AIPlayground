@@ -104,21 +104,54 @@ def get_model_from_db(model_id: str):
 
 
 def get_model_state_dict(model_id: str):
-    """Download model state dict from storage."""
+    """Download model state dict from storage. Validates non-empty to avoid 'missing or empty' inference errors."""
     try:
         model_data = get_model_from_db(model_id)
-        storage_path = model_data["model_storage_path"]
+        storage_path = model_data.get("model_storage_path")
+        # Fail fast with clear message if metadata has no storage path or file is empty
+        if not storage_path or not isinstance(storage_path, str):
+            raise ValueError(
+                f"Model {model_id} has no storage path (metadata only). "
+                "Re-save the model after training so the weights are uploaded."
+            )
 
         supabase = get_supabase_client()
 
-        # Download the model state dict
+        # Download the model state dict (returns bytes)
         response = supabase.storage.from_("ai-models").download(storage_path)
+        if not response or not isinstance(response, bytes):
+            raise ValueError(
+                f"Model {model_id}: storage returned no data. "
+                "Re-save the model after training so the weights are uploaded."
+            )
+        if len(response) == 0:
+            raise ValueError(
+                f"Model {model_id}: stored file is empty. "
+                "Re-train and save the model again so the weights are uploaded correctly."
+            )
 
-        # Response is bytes, decode to string
-        model_state_dict_b64 = response.decode()
-
+        # Response is bytes (UTF-8-encoded base64 string), decode to string
+        model_state_dict_b64 = response.decode("utf-8", errors="replace").strip()
+        if not model_state_dict_b64:
+            raise ValueError(
+                f"Model {model_id}: stored file is empty or not valid base64. "
+                "Re-train and save the model again."
+            )
+        logger.info(
+            "Downloaded model state dict model_id=%s storage_path=%s size_bytes=%s",
+            model_id,
+            storage_path,
+            len(response),
+        )
+        if len(response) < 200:
+            logger.warning(
+                "Model state dict is very small (%s bytes); inference may fail with truncated/corrupt file",
+                len(response),
+            )
         return model_state_dict_b64
 
+    except ValueError:
+        raise
     except Exception as e:
         logger.exception(f"Failed to download model state dict: {e}")
         raise

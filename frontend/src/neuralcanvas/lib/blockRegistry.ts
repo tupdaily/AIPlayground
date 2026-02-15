@@ -61,7 +61,8 @@ export type BlockType =
   | "Softmax"
   | "Add"
   | "Concat"
-  | "Augment";
+  | "Augment"
+  | "Model";
 
 /** Full definition for a single block type. */
 export interface BlockDefinition {
@@ -115,6 +116,7 @@ const BLOCK_COLORS = {
   PositionalEncoding:  "#0EA5E9", // sky
   PositionalEmbedding: "#0EA5E9", // sky
   Augment:              "#EA580C", // orange for data transform
+  Model:                "#10B981", // emerald (output/inference)
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -544,6 +546,20 @@ const AUGMENT_BLOCK: BlockDefinition = {
   description: "Transforms image data from the Input block only (rotate, flip, brightness, etc.). Connect Input → Augment → next block. Image data only; does not fetch its own data. Click the eye to preview.",
 };
 
+const MODEL_BLOCK: BlockDefinition = {
+  id: "Model",
+  type: "Model",
+  label: "Model",
+  icon: "cpu",
+  category: "output",
+  defaultParams: {},
+  paramSchema: [],
+  inputPorts: [{ id: "in", label: "Input" }],
+  outputPorts: [{ id: "out", label: "Output" }],
+  color: BLOCK_COLORS.Model,
+  description: "Run inference with a trained model. Connect a data source (Board, Input Space, etc.) and connect output to Display to see predictions.",
+};
+
 // ---------------------------------------------------------------------------
 // Registry map
 // ---------------------------------------------------------------------------
@@ -578,6 +594,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
   Add: ADD_BLOCK,
   Concat: CONCAT_BLOCK,
   Augment: AUGMENT_BLOCK,
+  Model: MODEL_BLOCK,
 };
 
 // ---------------------------------------------------------------------------
