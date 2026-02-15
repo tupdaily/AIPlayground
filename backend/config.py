@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""  # Anon key for frontend operations
     supabase_service_role_key: str = ""  # Service role key for backend operations
 
+    # Google Cloud Storage configuration
+    gcs_bucket_name: str = ""
+    google_application_credentials: str = ""
+    max_upload_size_mb: int = 200
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

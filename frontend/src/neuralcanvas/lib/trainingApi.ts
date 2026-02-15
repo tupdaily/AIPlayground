@@ -325,11 +325,25 @@ export function getApiBase(): string {
   return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 }
 
-export async function fetchDatasets(): Promise<
-  { id: string; name: string; description: string; input_shape: number[]; num_classes: number }[]
-> {
+export interface DatasetInfo {
+  id: string;
+  name: string;
+  description: string;
+  input_shape: number[];
+  num_classes: number;
+  num_samples?: number;
+  format?: string;
+  class_names?: string[];
+  is_builtin: boolean;
+}
+
+export async function fetchDatasets(accessToken?: string): Promise<DatasetInfo[]> {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/datasets/`);
+  const headers: HeadersInit = {};
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+  }
+  const res = await fetch(`${base}/api/datasets/`, { headers });
   if (!res.ok) throw new Error("Failed to fetch datasets");
   return res.json();
 }
@@ -367,6 +381,43 @@ export async function getClassLabelsForDataset(datasetId: string): Promise<strin
   }
   const fallback = KNOWN_DATASET_LABELS_FALLBACK[datasetId.toLowerCase()];
   return fallback ?? [];
+}
+
+export async function uploadDataset(
+  file: File,
+  name: string,
+  accessToken: string,
+  labelColumn?: string,
+): Promise<DatasetInfo> {
+  const base = getApiBase();
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("name", name);
+  if (labelColumn) formData.append("label_column", labelColumn);
+
+  const res = await fetch(`${base}/api/datasets/upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? "Upload failed");
+  }
+  return res.json();
+}
+
+export async function deleteDataset(datasetId: string, accessToken: string): Promise<void> {
+  const base = getApiBase();
+  const id = datasetId.replace("custom:", "");
+  const res = await fetch(`${base}/api/datasets/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? "Failed to delete dataset");
+  }
 }
 
 export async function startTraining(

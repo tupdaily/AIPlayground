@@ -11,6 +11,10 @@ frontend/out/
 .env
 .env.local
 
+# Service account keys
+backend/gcs-key.json
+**/gcs-key*.json
+
 # Data
 backend/data/
 backend/uploads/

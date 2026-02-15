@@ -20,11 +20,12 @@ gpu_config = LiveServerless(
         "torch>=2.0.0",
         "torchvision>=0.15.0",
         "pydantic==2.10.4",
-        "git+https://github.com/Ryan6407/AIPlayground.git#subdirectory=backend",
-        "requests>=2.28.0"
+        "git+https://github.com/Ryan6407/AIPlayground.git@peter/custom_data#subdirectory=backend",
+        "requests>=2.28.0",
+        "Pillow>=10.0.0",
     ]
 )
-async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict, job_id: str = None, backend_url: str = None):
+async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict, job_id: str = None, backend_url: str = None, custom_dataset_meta: dict = None, custom_dataset_signed_url: str = None):
     """
     Remote training function that runs on RunPod Flash GPU.
 
@@ -33,10 +34,12 @@ async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict
 
     Args:
         graph_dict: GraphSchema as dict
-        dataset_id: "mnist", "fashion_mnist", or "cifar10"
+        dataset_id: "mnist", "fashion_mnist", "cifar10", or "custom:<uuid>"
         config_dict: TrainingConfig as dict
         job_id: Training job ID (for callbacks)
         backend_url: Backend URL for callbacks (e.g., http://localhost:8000)
+        custom_dataset_meta: Metadata dict for custom datasets (from Supabase)
+        custom_dataset_signed_url: GCS signed URL for downloading the custom dataset
 
     Returns:
         Dict with training history and final model state_dict
@@ -50,10 +53,14 @@ async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict
     # Import from backend modules (Flash copies these automatically)
     from compiler.model_builder import build_model
     from compiler.validator import validate_graph, ValidationError
-    from training.datasets import get_dataloaders, get_dataset_shape
+    from training.datasets import get_dataloaders, get_dataset_shape, register_custom_dataset
     from models.schemas import GraphSchema, TrainingConfig
 
     try:
+        # Register custom dataset if provided
+        if dataset_id.startswith("custom:") and custom_dataset_meta and custom_dataset_signed_url:
+            register_custom_dataset(dataset_id, custom_dataset_meta, custom_dataset_signed_url)
+
         # Parse and validate inputs
         graph = GraphSchema(**graph_dict)
         config = TrainingConfig(**config_dict)

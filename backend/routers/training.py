@@ -6,10 +6,13 @@ import logging
 import uuid
 import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from supabase import create_client
 from models.schemas import TrainingRequest, GraphSchema, TrainingConfig
 from compiler.normalize_graph import normalize_graph
 from compiler.validator import validate_graph, ValidationError
 from training.trainer import train_model
+from training.datasets import register_custom_dataset
+from storage import generate_signed_url
 from config import settings
 
 # Import RunPod Flash trainer only if enabled
@@ -161,11 +164,30 @@ async def training_websocket(websocket: WebSocket, job_id: str):
 
     listener_task = asyncio.create_task(listen_for_commands())
 
+    # Register custom dataset if needed (before training starts)
+    custom_dataset_meta = None
+    custom_dataset_signed_url = None
+    if request.dataset_id.startswith("custom:"):
+        try:
+            raw_uuid = request.dataset_id.removeprefix("custom:")
+            sb = create_client(settings.supabase_url, settings.supabase_service_role_key)
+            result = sb.table("datasets").select("*").eq("id", raw_uuid).single().execute()
+            if not result.data:
+                await ws_callback({"type": "error", "message": "Custom dataset not found"})
+                return
+            custom_dataset_meta = result.data
+            custom_dataset_signed_url = generate_signed_url(custom_dataset_meta["gcs_path"], expiration_hours=2)
+            register_custom_dataset(request.dataset_id, custom_dataset_meta, custom_dataset_signed_url)
+        except Exception as e:
+            logger.exception("Failed to load custom dataset metadata: %s", e)
+            await ws_callback({"type": "error", "message": f"Failed to load custom dataset: {e}"})
+            return
+
     try:
         # Route to RunPod Flash or local training
         if settings.runpod_enabled:
             logger.info("Starting RunPod Flash training job_id=%s dataset_id=%s epochs=%s", job_id, request.dataset_id, request.training_config.epochs)
-            await train_with_runpod_flash(request, ws_callback, stop_event, job_id)
+            await train_with_runpod_flash(request, ws_callback, stop_event, job_id, custom_dataset_meta, custom_dataset_signed_url)
         else:
             logger.info("Starting local training job_id=%s dataset_id=%s epochs=%s", job_id, request.dataset_id, request.training_config.epochs)
             await train_model(
@@ -189,7 +211,7 @@ async def training_websocket(websocket: WebSocket, job_id: str):
             pass
 
 
-async def train_with_runpod_flash(request, ws_callback, stop_event, job_id=None):
+async def train_with_runpod_flash(request, ws_callback, stop_event, job_id=None, custom_dataset_meta=None, custom_dataset_signed_url=None):
     """Execute training on RunPod Flash and send results."""
     try:
         # Send started message
@@ -203,13 +225,17 @@ async def train_with_runpod_flash(request, ws_callback, stop_event, job_id=None)
         logger.info(f"Calling RunPod Flash with callback_url={callback_url}")
 
         try:
-            result = await train_model_flash(
+            flash_kwargs = dict(
                 graph_dict=request.graph.dict(),
                 dataset_id=request.dataset_id,
                 config_dict=request.training_config.dict(),
                 job_id=job_id,
-                backend_url=callback_url
+                backend_url=callback_url,
             )
+            if custom_dataset_meta and custom_dataset_signed_url:
+                flash_kwargs["custom_dataset_meta"] = custom_dataset_meta
+                flash_kwargs["custom_dataset_signed_url"] = custom_dataset_signed_url
+            result = await train_model_flash(**flash_kwargs)
         except Exception as e:
             logger.error(f"RunPod Flash call failed: {type(e).__name__}: {str(e)}")
             import traceback
