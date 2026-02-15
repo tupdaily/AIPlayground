@@ -50,6 +50,7 @@ import {
   usePeepInsideContext,
 } from "@/neuralcanvas/components/peep-inside/PeepInsideContext";
 import { PeepInsideModal } from "@/neuralcanvas/components/peep-inside/PeepInsideModal";
+import { AugmentPreviewModal } from "@/neuralcanvas/components/augment/AugmentPreviewModal";
 import { TrainingPanel } from "@/neuralcanvas/components/training/TrainingPanel";
 import { InferencePanel } from "@/neuralcanvas/components/inference/InferencePanel";
 import { GradientFlowProvider } from "@/neuralcanvas/components/peep-inside/GradientFlowContext";
@@ -88,6 +89,7 @@ import {
   SoftmaxBlock,
   AddBlock,
   ConcatBlock,
+  AugmentBlock,
 } from "@/neuralcanvas/components/blocks";
 
 // ---------------------------------------------------------------------------
@@ -161,6 +163,7 @@ const nodeTypes: NodeTypes = {
   Softmax: SoftmaxBlock,
   Add: AddBlock,
   Concat: ConcatBlock,
+  Augment: AugmentBlock,
   [CHALLENGE_TASK_NODE_TYPE]: ChallengeTaskNode,
 };
 
@@ -892,6 +895,11 @@ function CanvasInner({
     return () => clearTimeout(t);
   }, [isPaperLevel, paperFocusedNodeId, reactFlowInstance]);
 
+  // When canvas is empty or has one block, use a fixed comfortable zoom so blocks don't appear huge.
+  // Only fit view when there are 2+ nodes (so we don't zoom in on a single block).
+  const defaultViewport = isPaperLevel ? undefined : { x: 0, y: 0, zoom: 0.72 };
+  const shouldFitView = isPaperLevel || nodes.length > 1;
+
   return (
     <SuggestionContext.Provider value={suggestionContextValue}>
     <div className="flex w-full h-full">
@@ -946,7 +954,8 @@ function CanvasInner({
           defaultEdgeOptions={defaultEdgeOptions}
           panOnDrag={effectivePanOnDrag}
           selectionOnDrag={selectionOnDrag}
-          fitView
+          defaultViewport={defaultViewport}
+          fitView={shouldFitView}
           fitViewOptions={fitViewOptions}
           onInit={isPaperLevel
             ? (instance) => {
@@ -1433,7 +1442,51 @@ function InferenceToggle({
 // ── Renders the modal when a block is being peeped ──
 function PeepInsideOverlay() {
   const { target, close } = usePeepInsideContext();
+  const { setNodes, getNodes, getEdges } = useReactFlow();
   if (!target) return null;
+
+  if (target.blockType === "Augment") {
+    const color = BLOCK_REGISTRY.Augment?.color ?? "#EA580C";
+    const nodes = getNodes();
+    const edges = typeof getEdges === "function" ? getEdges() : [];
+    // Use the Input node that feeds this Augment block (so dataset_id matches the connected data source)
+    const edgeIntoAugment = edges.find((e) => e.target === target.blockId);
+    const sourceNode = edgeIntoAugment ? nodes.find((n) => n.id === edgeIntoAugment.source) : null;
+    const inputNode = sourceNode?.type === "Input" ? sourceNode : nodes.find((n) => n.type === "Input");
+    const raw = (inputNode?.data?.params as Record<string, unknown> | undefined)?.dataset_id;
+    const datasetIdStr =
+      typeof raw === "string" && raw.trim() && raw !== "__custom__"
+        ? raw.trim().toLowerCase()
+        : "mnist";
+    return (
+      <AugmentPreviewModal
+        open
+        onClose={close}
+        blockId={target.blockId}
+        initialAugmentations={(target.params?.augmentations as string) ?? "[]"}
+        datasetId={datasetIdStr}
+        anchorX={target.anchorX}
+        anchorY={target.anchorY}
+        color={color}
+        onSave={(augmentationsJson) => {
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === target.blockId
+                ? {
+                    ...n,
+                    data: {
+                      ...n.data,
+                      params: { ...(n.data?.params as Record<string, unknown>), augmentations: augmentationsJson },
+                    },
+                  }
+                : n
+            )
+          );
+        }}
+      />
+    );
+  }
+
   return (
     <PeepInsideModal
       blockId={target.blockId}

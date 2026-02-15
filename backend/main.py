@@ -1,6 +1,17 @@
 """AIPlayground Backend - FastAPI server for visual ML model building."""
 
 import os
+
+# Set SSL certs before any imports that trigger downloads (e.g. torchvision
+# datasets). Ensures MNIST/CIFAR-10 etc. can download on systems where Python
+# doesn't use the system CA bundle (e.g. some macOS installs).
+try:
+    import certifi
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+except ImportError:
+    pass
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import feedback, graphs, datasets, training, models

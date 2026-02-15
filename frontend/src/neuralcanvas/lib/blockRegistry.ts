@@ -60,7 +60,8 @@ export type BlockType =
   | "PositionalEmbedding"
   | "Softmax"
   | "Add"
-  | "Concat";
+  | "Concat"
+  | "Augment";
 
 /** Full definition for a single block type. */
 export interface BlockDefinition {
@@ -113,6 +114,7 @@ const BLOCK_COLORS = {
   TextEmbedding:       "#06B6D4", // cyan
   PositionalEncoding:  "#0EA5E9", // sky
   PositionalEmbedding: "#0EA5E9", // sky
+  Augment:              "#EA580C", // orange for data transform
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -528,6 +530,20 @@ const CONCAT_BLOCK: BlockDefinition = {
   description: "Concatenates two or more tensors along the given dimension.",
 };
 
+const AUGMENT_BLOCK: BlockDefinition = {
+  id: "Augment",
+  type: "Augment",
+  label: "Augment",
+  icon: "sparkles",
+  category: "data",
+  defaultParams: { augmentations: "[]" },
+  paramSchema: [],
+  inputPorts: [{ id: "in", label: "Input", expectedDims: 4 }],
+  outputPorts: [{ id: "out", label: "Output" }],
+  color: BLOCK_COLORS.Augment,
+  description: "Transforms image data from the Input block only (rotate, flip, brightness, etc.). Connect Input → Augment → next block. Image data only; does not fetch its own data. Click the eye to preview.",
+};
+
 // ---------------------------------------------------------------------------
 // Registry map
 // ---------------------------------------------------------------------------
@@ -561,6 +577,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
   Softmax: SOFTMAX_BLOCK,
   Add: ADD_BLOCK,
   Concat: CONCAT_BLOCK,
+  Augment: AUGMENT_BLOCK,
 };
 
 // ---------------------------------------------------------------------------

@@ -298,6 +298,18 @@ function computeBlockShape(
       return { outputShape: [b, c, poolDim(hin), poolDim(win)] };
     }
 
+    // ----- Augment (image-only; pass-through shape) -----
+    case "Augment": {
+      if (!inputShape) return { outputShape: null, error: "No input connected." };
+      if (inputShape.length !== 4) {
+        return {
+          outputShape: null,
+          error: `Augment expects 4D image input [batch, channels, height, width] but got ${inputShape.length}D ${getShapeLabel(inputShape)}. Use with image data only.`,
+        };
+      }
+      return { outputShape: [...inputShape] };
+    }
+
     // ----- MaxPool1D -----
     case "MaxPool1D": {
       if (!inputShape) return { outputShape: null, error: "No input connected." };
@@ -710,6 +722,16 @@ export function validateConnection(
         return {
           valid: false,
           error: `MaxPool2D expects 4D input [batch, channels, height, width] but got ${dims}D ${getShapeLabel(sourceShape)}.`,
+        };
+      }
+      return { valid: true };
+    }
+
+    case "Augment": {
+      if (dims !== 4) {
+        return {
+          valid: false,
+          error: `Augment expects 4D image input [batch, channels, height, width] but got ${dims}D ${getShapeLabel(sourceShape)}. Connect from Input or image data only.`,
         };
       }
       return { valid: true };

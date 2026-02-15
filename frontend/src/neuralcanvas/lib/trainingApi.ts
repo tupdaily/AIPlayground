@@ -45,6 +45,7 @@ export interface TrainingConfigSchema {
 const BACKEND_SUPPORTED_TYPES = new Set([
   "input",
   "output",
+  "augment",
   "linear",
   "conv2d",
   "maxpool2d",
@@ -201,6 +202,19 @@ function toBackendNodeType(
       };
     case "Output":
       return { type: "output", params: {} };
+    case "Augment": {
+      let augmentations: unknown[] = [];
+      try {
+        const raw = params.augmentations;
+        if (typeof raw === "string" && raw.trim()) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) augmentations = parsed.filter((a: unknown) => a && typeof (a as { id?: string }).id === "string");
+        }
+      } catch {
+        // leave empty
+      }
+      return { type: "augment", params: { augmentations } };
+    }
     default:
       return { type: typeLower, params };
   }

@@ -52,6 +52,7 @@ import {
   Upload,
   Monitor,
   PenTool,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -80,6 +81,7 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   upload: Upload,
   monitor: Monitor,
   "pen-tool": PenTool,
+  sparkles: Sparkles,
 };
 
 // ---------------------------------------------------------------------------

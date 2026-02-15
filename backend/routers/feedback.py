@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 
 # Allowed block types (must match frontend BlockType). "MaxPool" normalized to "MaxPool2D".
 ALLOWED_NODE_TYPES = frozenset({
-    "Input", "InputSpace", "Board", "TextInput", "Output", "Display",
+    "Input", "InputSpace", "Board", "TextInput", "Augment", "Output", "Display",
     "Linear", "Conv2D", "LSTM", "Attention", "LayerNorm", "BatchNorm",
     "Activation", "Dropout", "Flatten", "Embedding", "TextEmbedding",
     "PositionalEncoding", "PositionalEmbedding", "Softmax", "Add", "Concat",
@@ -56,6 +56,7 @@ BLOCKS_AND_SHAPES_REFERENCE = """
 - **InputSpace**: Custom data source. No input port. One output. Params: data_type ("image" | "table" | "text" | "webcam"), optional input_shape. Connect output to Input's "in" port for custom training data.
 - **Board**: Drawing canvas. No input port. One output. Params: width (8–224), height (8–224). User draws an image; output is resized and connected to Input for custom data.
 - **TextInput**: Token IDs for sequences. No input port. One output. Params: batch_size, seq_len. Output shape [B, seq_len].
+- **Augment**: Image augmentations (rotate, flip, brightness, contrast). One input "in" (4D image from Input). One output. Image data only. Connect Input → Augment → next block to augment training images.
 - **Output**: Model output (e.g. logits). One input port "in". No output. Must have exactly one Output in the graph.
 - **Display**: LCD-style display for predictions. One input port "in". No output. Optional; connect to Output or any tensor to show values. Shows no-signal when nothing connected.
 - **Linear**: Dense layer. Input: 2D [B, in_features]. Output: 2D [B, out_features]. Params: in_features, out_features.

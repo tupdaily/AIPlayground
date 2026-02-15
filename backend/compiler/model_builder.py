@@ -75,7 +75,7 @@ class DynamicModel(nn.Module):
         in_shape = shapes.get(src) if src else None
 
         match node.type:
-            case "input" | "text_input" | "output" | "add" | "concat":
+            case "input" | "text_input" | "output" | "augment" | "add" | "concat":
                 return None
 
             case "embedding":
@@ -211,6 +211,12 @@ class DynamicModel(nn.Module):
                 outputs[node_id] = torch.cat(
                     [outputs[s] for s in srcs], dim=dim
                 )
+                continue
+
+            if node.type == "augment":
+                src = get_input_node(self.graph, node_id)
+                if src is not None:
+                    outputs[node_id] = outputs[src]
                 continue
 
             # MultiheadAttention: query, key, value (self-attention: all same)
