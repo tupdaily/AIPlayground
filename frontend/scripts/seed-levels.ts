@@ -185,10 +185,11 @@ const LEVEL_4_SOLUTION: GraphSchema = {
 };
 
 // Level 5: Transformer-style (LayerNorm → Attention → Output). Uses 3D input [B, seq, dim]; Add available for later challenges.
+// Level 5 input must be 3D [batch, seq, features] so LayerNorm → Attention shapes match (Attention expects 3D).
 const LEVEL_5_GRAPH: GraphSchema = {
   version: "1.0",
   nodes: [
-    { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
+    { id: "input_1", type: "input", params: { input_shape: "64,128" }, position: { x: 80, y: 200 } },
     { id: "output_1", type: "output", params: {}, position: { x: 480, y: 200 } },
   ],
   edges: [],
@@ -202,8 +203,8 @@ const LEVEL_5_GRAPH: GraphSchema = {
 const LEVEL_5_SOLUTION: GraphSchema = {
   version: "1.0",
   nodes: [
-    { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
-    { id: "ln1", type: "layernorm", params: {}, position: { x: 200, y: 200 } },
+    { id: "input_1", type: "input", params: { input_shape: "64,128" }, position: { x: 80, y: 200 } },
+    { id: "ln1", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 200, y: 200 } },
     { id: "attn", type: "attention", params: { embed_dim: 128, num_heads: 4 }, position: { x: 320, y: 200 } },
     { id: "output_1", type: "output", params: {}, position: { x: 440, y: 200 } },
   ],
