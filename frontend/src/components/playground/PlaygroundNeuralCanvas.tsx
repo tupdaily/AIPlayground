@@ -41,7 +41,7 @@ export default function PlaygroundNeuralCanvas({
   const [isPaperLevel, setIsPaperLevel] = useState(false);
   const [loadedLevelName, setLoadedLevelName] = useState<string | null>(null);
   const [walkthroughStepIndex, setWalkthroughStepIndex] = useState(0);
-  const [walkthroughSteps, setWalkthroughSteps] = useState<typeof PAPER_WALKTHROUGHS[7] | null>(null);
+  const [walkthroughSteps, setWalkthroughSteps] = useState<typeof PAPER_WALKTHROUGHS[10] | null>(null);
   const [quizSelected, setQuizSelected] = useState<string | null>(null);
   const [quizCorrect, setQuizCorrect] = useState<boolean | null>(null);
   const [paperChatMessages, setPaperChatMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
@@ -111,7 +111,12 @@ export default function PlaygroundNeuralCanvas({
             const saved = progress[levelNum] ?? 0;
             const stepIndex = Math.min(Math.max(0, saved), steps.length - 1);
             setWalkthroughStepIndex(stepIndex);
-            const { nodes, edges } = levelGraphToNeuralCanvas(steps[stepIndex].graph, { forceSequentialLayout: true });
+            // ResNet (12) and GPT (14): use graph’s hardcoded positions (three-row / staggered). Others: sequential row.
+            const useGraphPositions = levelNum === 12 || levelNum === 14;
+            const { nodes, edges } = levelGraphToNeuralCanvas(steps[stepIndex].graph, {
+              forceSequentialLayout: !useGraphPositions,
+              sequentialSpacing: levelNum === 14 ? 400 : 320,
+            });
             setInitialGraph({ nodes, edges });
           } else {
             setWalkthroughSteps(null);
@@ -305,8 +310,11 @@ export default function PlaygroundNeuralCanvas({
   const canPrev = walkthroughStepIndex > 0;
   const canNext = walkthroughStepIndex < stepCount - 1;
 
+  // ResNet (12) and GPT (14) use graph’s hardcoded positions; other papers get sequential layout.
+  const levelNumForLayout = levelParam != null ? Number(levelParam) : 0;
+  const useGraphPositionsForStep = levelNumForLayout === 12 || levelNumForLayout === 14;
   const stepGraphNodesEdges = inWalkthrough && currentStep
-    ? levelGraphToNeuralCanvas(currentStep.graph, { forceSequentialLayout: true })
+    ? levelGraphToNeuralCanvas(currentStep.graph, { forceSequentialLayout: !useGraphPositionsForStep })
     : null;
   // New playgrounds (no id, no level) start empty; otherwise use loaded/level graph or empty while loading
   const initialNodes = stepGraphNodesEdges?.nodes ?? initialGraph?.nodes ?? [];

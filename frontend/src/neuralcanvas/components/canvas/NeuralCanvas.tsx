@@ -346,10 +346,14 @@ function CanvasInner({
       const nodesToAdd = [...layerIds]
         .map((id: string) => pending.newNodes.find((n: Node) => n.id === id))
         .filter((n): n is Node => !!n)
-        .map((n) => ({ ...n, data: { ...n.data, animateFromPalette: true } }));
-      const edgesToAdd = pending.newEdges.filter(
-        (e) => layerIds.has(e.target) && placedIds.has(e.source)
-      );
+        .map((n) => ({
+          ...n,
+          className: "agent-suggested-node",
+          data: { ...n.data, animateFromPalette: true },
+        }));
+      const edgesToAdd = pending.newEdges
+        .filter((e) => layerIds.has(e.target) && placedIds.has(e.source))
+        .map((e) => ({ ...e, data: { ...e.data, animateIn: true } }));
       // On first layer: clear any existing suggestion (gen-*) to avoid duplicate keys when two networks coexist.
       // Add nodes first so React Flow can measure them before computing edge paths.
       const isFirstLayer = layerIndex === 0;
@@ -377,13 +381,24 @@ function CanvasInner({
       } else {
         suggestionAnimationRef.current = null;
         setSuggestionAnimationTrigger(null);
+        // Smoothly pan/zoom to show the new suggestion (don't add to timeouts so it still runs after cleanup)
+        const suggestedNodeRefs = pending.newNodes.map((n) => ({ id: n.id }));
+        setTimeout(() => {
+          try {
+            reactFlowInstance.fitView({
+              nodes: suggestedNodeRefs,
+              padding: 0.4,
+              duration: 400,
+            });
+          } catch (_) {}
+        }, 150);
       }
     };
 
     const t = setTimeout(scheduleNext, 320);
     timeouts.push(t);
     return () => timeouts.forEach((id) => clearTimeout(id));
-  }, [suggestionAnimationTrigger, setNodes, setEdges]);
+  }, [suggestionAnimationTrigger, setNodes, setEdges, reactFlowInstance]);
 
   // ── Drag-and-drop from palette ──
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -1198,14 +1213,22 @@ function ChatBar({
             )}
             {loading && (
               <div className="flex justify-start">
-                <div className="max-w-[65%] px-3 py-2 rounded-2xl rounded-bl-md bg-[var(--surface-elevated)] text-xs text-[var(--foreground-muted)] flex items-center gap-2">
-                  <span className="animate-pulse">Thinking...</span>
+                <div className="max-w-[65%] px-3 py-2.5 rounded-2xl rounded-bl-md bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--foreground-muted)] flex items-center gap-2.5">
+                  <span className="flex gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-thinking-dot" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-thinking-dot" style={{ animationDelay: "160ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-thinking-dot" style={{ animationDelay: "320ms" }} />
+                  </span>
+                  <span>Designing your model...</span>
                 </div>
               </div>
             )}
             {suggestionCtx?.pendingSuggestionIds?.length && (
-              <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-xl bg-[var(--accent-muted)]/50 border border-[var(--accent)]/40">
-                <span className="text-xs font-medium text-[var(--foreground)]">Suggested architecture added to canvas</span>
+              <div className="flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-[var(--accent-muted)]/60 border border-[var(--accent)]/50 shadow-sm">
+                <span className="text-xs font-medium text-[var(--foreground)] flex items-center gap-2">
+                  <span className="flex h-1.5 w-1.5 rounded-full bg-[var(--success)] animate-pulse" />
+                  Suggested architecture added to canvas
+                </span>
                 <div className="flex gap-2 shrink-0">
                   <button
                     type="button"

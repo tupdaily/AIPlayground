@@ -101,6 +101,8 @@ function needsSequentialLayout(nodes: { position?: { x?: number; y?: number } }[
 export interface LevelGraphToNeuralCanvasOptions {
   /** When true, always lay out nodes in a horizontal row (no stacking). Use for paper walkthrough steps so each new block is clearly visible and connectors show. */
   forceSequentialLayout?: boolean;
+  /** Horizontal spacing between nodes when using sequential layout. Default 300. Use e.g. 320 for paper walkthroughs so blocks are more spread out. */
+  sequentialSpacing?: number;
 }
 
 /**
@@ -229,11 +231,12 @@ export function levelGraphToNeuralCanvas(
 
   const useSequential =
     options?.forceSequentialLayout === true || needsSequentialLayout(mappedNodes);
+  const spacing = options?.sequentialSpacing ?? SEQUENTIAL_LAYOUT_SPACING;
   const nodes: Node[] = useSequential
     ? mappedNodes.map((node, i) => ({
         ...node,
         position: {
-          x: SEQUENTIAL_LAYOUT_START.x + i * SEQUENTIAL_LAYOUT_SPACING,
+          x: SEQUENTIAL_LAYOUT_START.x + i * spacing,
           y: SEQUENTIAL_LAYOUT_START.y,
         },
       }))

@@ -228,10 +228,13 @@ function BlockNodeComponent({ id, type, data, selected }: NodeProps<Node<BlockNo
   if (animateFromPalette) {
     return (
       <motion.div
-        initial={{ opacity: 0, x: -120 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-        style={{ width: "100%" }}
+        initial={{ opacity: 0, x: -80, scale: 0.9 }}
+        animate={{ opacity: 1, x: 0, scale: 1 }}
+        transition={{
+          duration: 0.6,
+          ease: [0.22, 0.61, 0.36, 1],
+        }}
+        style={{ width: "100%", transformOrigin: "left center" }}
       >
         {blockContent}
       </motion.div>
