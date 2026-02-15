@@ -44,6 +44,7 @@ import {
   Wrench,
   Star,
   Minimize2,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -71,6 +72,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   upload: Upload,
   monitor: Monitor,
   "pen-tool": PenTool,
+  sparkles: Sparkles,
 };
 
 const CATEGORIES: {
@@ -125,6 +127,7 @@ const FRIENDLY_DESCRIPTIONS: Record<string, string> = {
   Softmax: "Converts numbers into probabilities",
   Add: "Combines two paths together (residual connection)",
   Concat: "Joins two data streams side by side",
+  Augment: "Transforms image data from Input only (rotate, flip, brightness). Connect Input → Augment. Click the eye to preview.",
 };
 
 // ---------------------------------------------------------------------------

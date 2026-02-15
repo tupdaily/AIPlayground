@@ -33,6 +33,7 @@ import {
   FoldHorizontal,
   Hash,
   Percent,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -54,6 +55,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "fold-horizontal": FoldHorizontal,
   hash: Hash,
   percent: Percent,
+  sparkles: Sparkles,
 };
 
 const FRIENDLY_NAMES: Record<string, string> = {

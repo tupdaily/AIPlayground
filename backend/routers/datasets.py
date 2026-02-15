@@ -6,12 +6,13 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
+from fastapi.responses import Response
 from supabase import create_client
 
 from auth import get_current_user_id
 from config import settings
 from storage import upload_to_gcs, delete_from_gcs
-from training.datasets import BUILTIN_DATASETS
+from training.datasets import BUILTIN_DATASETS, get_dataset_sample_png, generate_random_sample_png
 from training.dataset_validation import validate_csv, validate_image_zip
 
 logger = logging.getLogger(__name__)
@@ -183,3 +184,35 @@ async def delete_dataset(
     sb.table("datasets").delete().eq("id", raw_id).execute()
 
     return {"status": "deleted"}
+
+
+# ---------------------------------------------------------------------------
+# Sample image for Augment block preview (eye button in the UI)
+# ---------------------------------------------------------------------------
+@router.get("/{dataset_id}/sample")
+async def get_dataset_sample(dataset_id: str):
+    """Return one random sample image from a built-in dataset as PNG.
+
+    Used by the Augment block's preview modal so the user sees a real (or
+    fallback) image for the selected dataset (mnist, fashion_mnist, cifar10).
+    Custom datasets are not supported; returns 404 for __custom__ or unknown id.
+    On download failure (e.g. SSL), we fall back to a generated random image.
+    """
+    if not dataset_id or dataset_id.strip().lower() == "__custom__":
+        raise HTTPException(status_code=404, detail="No sample for custom dataset")
+    key = dataset_id.strip().lower()
+    if key not in BUILTIN_DATASETS:
+        raise HTTPException(status_code=404, detail="Unknown dataset")
+    try:
+        # Prefer one random image from the actual dataset; fallback to generated if download fails (e.g. SSL)
+        png_bytes = get_dataset_sample_png(key)
+    except Exception:
+        try:
+            png_bytes = generate_random_sample_png(key)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={"Cache-Control": "no-store, no-cache"},
+    )

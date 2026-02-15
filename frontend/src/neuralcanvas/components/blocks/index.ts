@@ -26,3 +26,4 @@ export { PositionalEmbeddingBlock } from "./PositionalEmbeddingBlock";
 export { SoftmaxBlock } from "./SoftmaxBlock";
 export { AddBlock } from "./AddBlock";
 export { ConcatBlock } from "./ConcatBlock";
+export { AugmentBlock } from "./AugmentBlock";

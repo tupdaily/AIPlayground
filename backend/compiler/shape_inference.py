@@ -42,6 +42,11 @@ def infer_shapes(
             if src and src in shapes:
                 shapes[node_id] = shapes[src]
 
+        elif node.type == "augment":
+            src = get_input_node(graph, node_id)
+            if src and src in shapes:
+                shapes[node_id] = list(shapes[src])
+
         elif node.type == "linear":
             src = get_input_node(graph, node_id)
             if src is None or src not in shapes:
