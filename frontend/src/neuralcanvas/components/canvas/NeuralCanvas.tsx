@@ -552,11 +552,13 @@ function CanvasInner({
       const row = effectivePlaygroundId ? await getPlayground(effectivePlaygroundId) : null;
       if (row) {
         metadata = {
-          name: row.name,
+          name: playgroundName?.trim() || row.name,
           created_at: (row.graph_json as { metadata?: { created_at?: string } } | undefined)?.metadata?.created_at,
         };
-      } else if (playgroundName) {
-        metadata = { name: playgroundName };
+      } else if (playgroundName?.trim()) {
+        metadata = { name: playgroundName.trim() };
+      } else {
+        metadata = { name: "Untitled" };
       }
       const graph = neuralCanvasToGraphSchema(
         nodes.filter((n) => n.type !== CHALLENGE_TASK_NODE_TYPE),
@@ -564,10 +566,11 @@ function CanvasInner({
         metadata
       );
       if (effectivePlaygroundId) {
+        const nameToSave = playgroundName?.trim() || row?.name || graph.metadata?.name;
         const ok = await updatePlayground(
           effectivePlaygroundId,
           graph,
-          row?.name ?? graph.metadata?.name
+          nameToSave
         );
         setSaveStatus(ok ? "saved" : "error");
         if (ok) setTimeout(() => setSaveStatus("idle"), 2000);
