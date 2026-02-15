@@ -7,6 +7,7 @@
 
 import {
   memo,
+  useMemo,
   useState,
   useEffect,
   useCallback,
@@ -23,7 +24,7 @@ import {
   type ParamSchema,
 } from "@/neuralcanvas/lib/blockRegistry";
 import { CANVAS_UI_SCALE, BLOCK_BASE_WIDTH } from "@/neuralcanvas/lib/canvasConstants";
-import { getShapeLabel, getShapeLabelTooltip } from "@/neuralcanvas/lib/shapeEngine";
+import { getShapeLabel, getShapeLabelTooltip, inferInputParamsFromShape } from "@/neuralcanvas/lib/shapeEngine";
 import { useShapes } from "@/neuralcanvas/components/canvas/ShapeContext";
 import { usePeepInsideContext } from "@/neuralcanvas/components/peep-inside/PeepInsideContext";
 import {
@@ -122,10 +123,11 @@ interface NumberParamProps {
   max?: number;
   step?: number;
   color: string;
+  disabled?: boolean;
   onChange: (v: number) => void;
 }
 
-function NumberParam({ value, min, max, step = 1, color, onChange }: NumberParamProps) {
+function NumberParam({ value, min, max, step = 1, color, disabled, onChange }: NumberParamProps) {
   const clamp = useCallback(
     (v: number) => {
       let n = v;
@@ -187,7 +189,8 @@ function NumberParam({ value, min, max, step = 1, color, onChange }: NumberParam
         min={min}
         max={max}
         step={step}
-        className="
+        disabled={disabled}
+        className={`
           nodrag nopan
           w-[52px] px-1.5 py-0.5 rounded-md text-[12px] font-mono text-center
           bg-[var(--surface-elevated)] border border-[var(--border)]
@@ -197,24 +200,27 @@ function NumberParam({ value, min, max, step = 1, color, onChange }: NumberParam
           [appearance:textfield]
           [&::-webkit-outer-spin-button]:appearance-none
           [&::-webkit-inner-spin-button]:appearance-none
-        "
+          ${disabled ? "opacity-50 cursor-not-allowed" : ""}
+        `}
       />
-      <div className="flex flex-col -space-y-px">
-        <button
-          className="nodrag nopan p-0 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
-          onClick={() => onChange(clamp(value + step))}
-          tabIndex={-1}
-        >
-          <ChevronUp size={10} />
-        </button>
-        <button
-          className="nodrag nopan p-0 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
-          onClick={() => onChange(clamp(value - step))}
-          tabIndex={-1}
-        >
-          <ChevronDown size={10} />
-        </button>
-      </div>
+      {!disabled && (
+        <div className="flex flex-col -space-y-px">
+          <button
+            className="nodrag nopan p-0 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
+            onClick={() => onChange(clamp(value + step))}
+            tabIndex={-1}
+          >
+            <ChevronUp size={10} />
+          </button>
+          <button
+            className="nodrag nopan p-0 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
+            onClick={() => onChange(clamp(value - step))}
+            tabIndex={-1}
+          >
+            <ChevronDown size={10} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -259,10 +265,11 @@ interface ParamRowProps {
   schema: ParamSchema;
   value: number | string;
   color: string;
+  disabled?: boolean;
   onUpdate: (name: string, value: number | string) => void;
 }
 
-function ParamRow({ schema, value, color, onUpdate }: ParamRowProps) {
+function ParamRow({ schema, value, color, disabled, onUpdate }: ParamRowProps) {
   const friendlyName = FRIENDLY_PARAM_NAMES[schema.name] ?? schema.name;
 
   const renderInput = () => {
@@ -285,6 +292,7 @@ function ParamRow({ schema, value, color, onUpdate }: ParamRowProps) {
         max={schema.max}
         step={step}
         color={color}
+        disabled={disabled}
         onChange={(v) => onUpdate(schema.name, v)}
       />
     );
@@ -292,8 +300,11 @@ function ParamRow({ schema, value, color, onUpdate }: ParamRowProps) {
 
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[11px] text-[var(--foreground-muted)] font-medium truncate" title={`${friendlyName} (${schema.name})`}>
-        {friendlyName}
+      <span
+        className={`text-[11px] font-medium truncate ${disabled ? "text-[var(--foreground-muted)] opacity-50" : "text-[var(--foreground-muted)]"}`}
+        title={disabled ? `${friendlyName} — auto-set from input shape` : `${friendlyName} (${schema.name})`}
+      >
+        {friendlyName}{disabled ? " (auto)" : ""}
       </span>
       {renderInput()}
     </div>
@@ -359,6 +370,14 @@ function BaseBlockComponent({
   const hasError = !!result?.error;
   const inLabel = getShapeLabel(result?.inputShape ?? null);
   const outLabel = getShapeLabel(result?.outputShape ?? null);
+
+  // Determine which params are auto-inferred from input shape (should be read-only)
+  const inferredParamNames = useMemo(() => {
+    const inputShape = result?.inputShape ?? null;
+    if (!inputShape?.length) return new Set<string>();
+    const inferred = inferInputParamsFromShape(blockType, inputShape);
+    return inferred ? new Set(Object.keys(inferred)) : new Set<string>();
+  }, [result?.inputShape, blockType]);
 
   const onParamUpdate = useCallback(
     (name: string, value: number | string) => {
@@ -456,6 +475,7 @@ function BaseBlockComponent({
               schema={schema}
               value={params[schema.name] ?? def.defaultParams[schema.name] ?? 0}
               color={color}
+              disabled={inferredParamNames.has(schema.name)}
               onUpdate={onParamUpdate}
             />
           ))}
