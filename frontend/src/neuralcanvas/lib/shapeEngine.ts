@@ -199,13 +199,32 @@ function computeBlockShape(
   switch (blockType) {
     // ----- Input -----
     case "Input": {
-      // Output shape comes from the dataset chosen on the Input block (params.input_shape as "C,H,W").
+      // When Input Space is connected, pass through its output shape.
+      if (inputShape && inputShape.length > 0) return { outputShape: inputShape };
+      // Otherwise use dataset shape from params (params.input_shape as "C,H,W").
       const shapeStr = params.input_shape;
       if (typeof shapeStr === "string" && shapeStr.trim().length > 0) {
         const dims = shapeStr.split(",").map((x) => parseInt(String(x).trim(), 10)).filter((n) => Number.isFinite(n));
         if (dims.length > 0) return { outputShape: ["B", ...dims] };
       }
       return { outputShape: ["B", 1, 28, 28] };
+    }
+
+    // ----- InputSpace -----
+    case "InputSpace": {
+      const shapeStr = params.input_shape;
+      if (typeof shapeStr === "string" && shapeStr.trim().length > 0) {
+        const dims = shapeStr.split(",").map((x) => parseInt(String(x).trim(), 10)).filter((n) => Number.isFinite(n));
+        if (dims.length > 0) return { outputShape: ["B", ...dims] };
+      }
+      return { outputShape: ["B", 1, 28, 28] };
+    }
+
+    // ----- Board (drawing canvas; output resized to width×height, 1 channel) -----
+    case "Board": {
+      const w = intParam(params, "width", 28);
+      const h = intParam(params, "height", 28);
+      return { outputShape: ["B", 1, h, w] };
     }
 
     // ----- TextInput -----
@@ -390,8 +409,14 @@ function computeBlockShape(
       return { outputShape: [...inputShape] };
     }
 
-    // ----- Output (sink: accepts any shape, no output) -----
+    // ----- Output (accepts any shape; passes through for Display etc.) -----
     case "Output": {
+      if (!inputShape) return { outputShape: null, error: "No input connected." };
+      return { outputShape: [...inputShape] }; // Pass through so Output → Display gets shape.
+    }
+
+    // ----- Display (sink: LCD monitor for predictions, no output) -----
+    case "Display": {
       if (!inputShape) return { outputShape: null, error: "No input connected." };
       return { outputShape: null }; // Sink — no downstream shape.
     }
@@ -625,6 +650,10 @@ export function validateConnection(
   const dims = sourceShape.length;
 
   switch (targetType) {
+    case "Input":
+      // Custom data from InputSpace or any source — accept any shape.
+      return { valid: true };
+
     case "Linear": {
       // Linear works on any rank ≥ 1 (applies to last dim). Compare numerically so 784 and "784" match.
       const inF = intParam(params, "in_features", 784);
@@ -798,8 +827,9 @@ export function validateConnection(
     case "TextInput":
       return { valid: true };
 
-    // Output accepts any shape.
+    // Output and Display accept any shape.
     case "Output":
+    case "Display":
       return { valid: true };
 
     // Add: two inputs (same shape enforced at runtime). Concat: two+ inputs.

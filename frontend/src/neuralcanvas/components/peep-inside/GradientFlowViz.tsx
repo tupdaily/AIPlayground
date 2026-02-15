@@ -303,10 +303,12 @@ function GradientFlowVizComponent({
           {overallHealth === "healthy" && "Healthy"}
           {overallHealth === "vanishing" && "Vanishing"}
           {overallHealth === "exploding" && "Exploding"}
-          {overallHealth === "unknown" && "Unknown"}
+          {overallHealth === "unknown" && "No data yet"}
         </div>
-        <span className="text-[9px] text-neutral-600 font-mono">
-          avg norm: {overallNorm.toExponential(2)}
+        <span className="text-[9px] font-mono text-[var(--foreground-muted)]">
+          {overallHealth === "unknown" && overallNorm === 0
+            ? "avg norm: —"
+            : `avg norm: ${overallNorm.toExponential(2)}`}
         </span>
       </div>
 
@@ -473,7 +475,10 @@ function GradientFlowVizComponent({
         {[
           {
             label: "norm",
-            value: overallNorm.toExponential(2),
+            value:
+              overallHealth === "unknown" && overallNorm === 0
+                ? "—"
+                : overallNorm.toExponential(2),
             color: healthToColor(overallHealth),
           },
           {

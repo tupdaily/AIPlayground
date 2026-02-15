@@ -8,7 +8,9 @@
 import {
   memo,
   useState,
+  useEffect,
   useCallback,
+  useRef,
   type ReactNode,
   type ChangeEvent,
 } from "react";
@@ -24,7 +26,6 @@ import { CANVAS_UI_SCALE, BLOCK_BASE_WIDTH } from "@/neuralcanvas/lib/canvasCons
 import { getShapeLabel, getShapeLabelTooltip } from "@/neuralcanvas/lib/shapeEngine";
 import { useShapes } from "@/neuralcanvas/components/canvas/ShapeContext";
 import { usePeepInsideContext } from "@/neuralcanvas/components/peep-inside/PeepInsideContext";
-import { useGradientFlow, healthToColor } from "@/neuralcanvas/components/peep-inside/GradientFlowContext";
 import {
   Inbox,
   Target,
@@ -47,6 +48,9 @@ import {
   AlertCircle,
   ChevronUp,
   ChevronDown,
+  Upload,
+  Monitor,
+  PenTool,
   type LucideIcon,
 } from "lucide-react";
 
@@ -72,6 +76,9 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   percent: Percent,
   plus: Plus,
   merge: Combine,
+  upload: Upload,
+  monitor: Monitor,
+  "pen-tool": PenTool,
 };
 
 // ---------------------------------------------------------------------------
@@ -129,20 +136,54 @@ function NumberParam({ value, min, max, step = 1, color, onChange }: NumberParam
     [min, max],
   );
 
+  const [localValue, setLocalValue] = useState<string>(() => String(value));
+  const isFocusedRef = useRef(false);
+  useEffect(() => {
+    if (!isFocusedRef.current) setLocalValue(String(value));
+  }, [value]);
+
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
-      const parsed = step < 1 ? parseFloat(e.target.value) : parseInt(e.target.value, 10);
+      const raw = e.target.value;
+      setLocalValue(raw);
+      if (raw === "" || raw === "-") return;
+      const parsed = step < 1 ? parseFloat(raw) : parseInt(raw, 10);
       if (Number.isFinite(parsed)) onChange(clamp(parsed));
     },
     [onChange, clamp, step],
   );
 
+  const handleFocus = useCallback(() => {
+    isFocusedRef.current = true;
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    isFocusedRef.current = false;
+    const trimmed = localValue.trim();
+    if (trimmed === "" || trimmed === "-") {
+      const fallback = min !== undefined ? min : 0;
+      onChange(clamp(fallback));
+      setLocalValue(String(fallback));
+      return;
+    }
+    const parsed = step < 1 ? parseFloat(trimmed) : parseInt(trimmed, 10);
+    if (Number.isFinite(parsed)) {
+      const clamped = clamp(parsed);
+      onChange(clamped);
+      setLocalValue(String(clamped));
+    } else {
+      setLocalValue(String(value));
+    }
+  }, [localValue, min, step, value, onChange, clamp]);
+
   return (
     <div className="flex items-center gap-0.5">
       <input
         type="number"
-        value={value}
+        value={localValue}
         onChange={handleChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         min={min}
         max={max}
         step={step}
@@ -293,9 +334,6 @@ function BaseBlockComponent({
   const [errorTooltip, setErrorTooltip] = useState(false);
   const [showShape, setShowShape] = useState(false);
   const { open: openPeep } = usePeepInsideContext();
-  const { enabled: gradFlowEnabled, gradients: gradMap } = useGradientFlow();
-  const gradInfo = gradFlowEnabled ? gradMap.get(id) : undefined;
-  const gradGlowColor = gradInfo ? healthToColor(gradInfo.health) : undefined;
 
   const handlePeepInside = useCallback(
     (e: React.MouseEvent) => {
@@ -310,6 +348,7 @@ function BaseBlockComponent({
           blockType === "Activation"
             ? String(params.activation ?? "")
             : undefined,
+        params: { ...params },
       });
     },
     [id, blockType, params, openPeep],
@@ -358,16 +397,7 @@ function BaseBlockComponent({
         ${selected ? "ring-2 shadow-lg scale-[1.01]" : "shadow-[var(--shadow-card)]"}
         ${hasError ? "border-[var(--danger)] ring-[var(--danger-strong)]" : selected ? "border-[var(--accent)] ring-[var(--accent-strong)]" : "border-[var(--border)] hover:shadow-[var(--shadow-card-hover)]"}
       `}
-      style={{
-        width: def.width ?? BLOCK_BASE_WIDTH,
-        ...(gradFlowEnabled && gradGlowColor
-          ? {
-              boxShadow: `0 0 ${Math.min(gradInfo!.norm * 40, 20)}px ${gradGlowColor}40, var(--shadow-card)`,
-              outline: `2px solid ${gradGlowColor}40`,
-              outlineOffset: -1,
-            }
-          : {}),
-      }}
+      style={{ width: def.width ?? BLOCK_BASE_WIDTH }}
     >
       {/* ── Colored left accent bar ── */}
       <div

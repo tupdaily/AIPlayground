@@ -65,8 +65,10 @@ export function healthToColor(health: GradientHealth): string {
       return "#ef4444"; // red
     case "exploding":
       return "#3b82f6"; // blue
+    case "unknown":
+      return "#6b7280"; // gray — visible when no data yet
     default:
-      return "transparent";
+      return "#6b7280";
   }
 }
 
@@ -125,25 +127,31 @@ export function GradientFlowProvider({ children }: { children: ReactNode }) {
     setGradients(data);
   }, []);
 
+  /**
+   * Seed a deterministic demo so the overlay is educational: each block gets
+   * a fixed health (healthy / vanishing / exploding) in a repeating pattern.
+   * User sees all three colors and the on-canvas legend explains them.
+   */
   const seedDemo = useCallback((blockIds: string[]) => {
     const map = new Map<string, GradientInfo>();
-    blockIds.forEach((id) => {
-      const norm = Math.pow(10, Math.random() * 6 - 5); // 1e-5 to 10
-      const health = classifyGradient(norm);
+    const normsByHealth: Record<GradientHealth, number> = {
+      healthy: 0.2,
+      vanishing: 1e-5,
+      exploding: 15,
+      unknown: 0.1,
+    };
+    blockIds.forEach((id, index) => {
+      const health: GradientHealth = index % 3 === 0 ? "healthy" : index % 3 === 1 ? "vanishing" : "exploding";
+      const norm = normsByHealth[health];
       const histLen = 20;
-      const normHistory: number[] = [];
-      let cur = norm * 0.3;
-      for (let i = 0; i < histLen; i++) {
-        cur += (norm - cur) * 0.1 + (Math.random() - 0.5) * norm * 0.2;
-        normHistory.push(Math.max(0, cur));
-      }
+      const normHistory = Array.from({ length: histLen }, () => norm * (0.8 + Math.random() * 0.4));
       map.set(id, {
         health,
         norm,
         normHistory,
         params: [
-          { name: "weight", norm: norm * (0.8 + Math.random() * 0.4), health: classifyGradient(norm * 0.9) },
-          { name: "bias", norm: norm * (0.1 + Math.random() * 0.3), health: classifyGradient(norm * 0.2) },
+          { name: "weight", norm, health },
+          { name: "bias", norm: norm * 0.2, health },
         ],
       });
     });

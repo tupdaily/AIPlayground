@@ -41,6 +41,7 @@ import {
 } from "@/neuralcanvas/lib/blockRegistry";
 import { validateConnection, inferInputParamsFromShape } from "@/neuralcanvas/lib/shapeEngine";
 import { ShapeProvider, useShapes } from "./ShapeContext";
+import { PredictionProvider } from "./PredictionContext";
 import { ConnectionWire } from "./ConnectionWire";
 import { BlockPalette, DRAG_BLOCK_TYPE } from "./BlockPalette";
 import { useUndoRedo } from "@/neuralcanvas/hooks/useUndoRedo";
@@ -51,10 +52,7 @@ import {
 import { PeepInsideModal } from "@/neuralcanvas/components/peep-inside/PeepInsideModal";
 import { TrainingPanel } from "@/neuralcanvas/components/training/TrainingPanel";
 import { InferencePanel } from "@/neuralcanvas/components/inference/InferencePanel";
-import {
-  GradientFlowProvider,
-  useGradientFlow,
-} from "@/neuralcanvas/components/peep-inside/GradientFlowContext";
+import { GradientFlowProvider } from "@/neuralcanvas/components/peep-inside/GradientFlowContext";
 import { neuralCanvasToGraphSchema, levelGraphToNeuralCanvas, graphsMatchStructurally, computeTopologicalLayers } from "@/lib/levelGraphAdapter";
 import type { GraphSchema } from "@/types/graph";
 import { createPlayground, updatePlayground, getPlayground } from "@/lib/supabase/playgrounds";
@@ -66,8 +64,11 @@ import ReactMarkdown from "react-markdown";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   InputBlock,
+  InputSpaceBlock,
+  BoardBlock,
   TextInputBlock,
   OutputBlock,
+  DisplayBlock,
   LinearBlock,
   Conv2DBlock,
   MaxPool2DBlock,
@@ -135,8 +136,11 @@ function ChallengeTaskNode({ data }: NodeProps<Node<{ task?: string; isPaperLeve
 
 const nodeTypes: NodeTypes = {
   Input: InputBlock,
+  InputSpace: InputSpaceBlock,
+  Board: BoardBlock,
   TextInput: TextInputBlock,
   Output: OutputBlock,
+  Display: DisplayBlock,
   Linear: LinearBlock,
   Conv2D: Conv2DBlock,
   MaxPool2D: MaxPool2DBlock,
@@ -164,6 +168,7 @@ const edgeTypes: EdgeTypes = {
 const defaultEdgeOptions = {
   type: "shape" as const,
   animated: false,
+  selectable: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -491,14 +496,25 @@ function CanvasInner({
     [nodes, edges, shapes, setEdges, takeSnapshot],
   );
 
+  // ── Edge deletion (connection only) ──
+  const deleteSelectedEdges = useCallback(() => {
+    const selectedEdgeIds = edges.filter((e) => e.selected).map((e) => e.id);
+    if (selectedEdgeIds.length === 0) return false;
+    takeSnapshot(nodes, edges);
+    const ids = new Set(selectedEdgeIds);
+    setEdges((eds) => eds.filter((e) => !ids.has(e.id)));
+    return true;
+  }, [nodes, edges, setEdges, takeSnapshot]);
+
   // ── Node deletion ──
   const deleteSelectedNodes = useCallback(() => {
     const selected = nodes.filter((n) => n.selected);
-    if (selected.length === 0) return;
+    if (selected.length === 0) return false;
     takeSnapshot(nodes, edges);
     const ids = new Set(selected.map((n) => n.id));
     setNodes((nds) => nds.filter((n) => !ids.has(n.id)));
     setEdges((eds) => eds.filter((e) => !ids.has(e.source) && !ids.has(e.target)));
+    return true;
   }, [nodes, edges, setNodes, setEdges, takeSnapshot]);
 
   // ── Duplicate selected node ──
@@ -705,9 +721,10 @@ function CanvasInner({
       // Don't capture when user is typing in an input.
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
 
-      // Delete / Backspace → remove selected
+      // Delete / Backspace → remove selected edges first, else selected nodes
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
+        if (deleteSelectedEdges()) return;
         deleteSelectedNodes();
         return;
       }
@@ -762,6 +779,7 @@ function CanvasInner({
     edges,
     setNodes,
     setEdges,
+    deleteSelectedEdges,
     deleteSelectedNodes,
     duplicateSelectedNode,
     undo,
@@ -813,6 +831,11 @@ function CanvasInner({
     [pendingSuggestionIds, onAcceptSuggestion, onDeclineSuggestion]
   );
 
+  // Paper mode: zoom out more so blocks and connectors are visible; avoid single-block zoom-in
+  const fitViewOptions = isPaperLevel
+    ? { padding: 0.65, minZoom: 0.2, maxZoom: 0.85 }
+    : { padding: 0.3 };
+
   return (
     <SuggestionContext.Provider value={suggestionContextValue}>
     <div className="flex w-full h-full">
@@ -827,46 +850,52 @@ function CanvasInner({
         onDragOver={onDragOver}
         onDrop={onDrop}
       >
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        defaultEdgeOptions={defaultEdgeOptions}
-        panOnDrag={panOnDrag}
-        selectionOnDrag={!panOnDrag}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.15}
-        maxZoom={2.5}
-        proOptions={{ hideAttribution: true }}
-        deleteKeyCode={null} // We handle delete ourselves.
-      >
-        {/* Light dot grid background */}
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={24}
-          size={1}
-          color="var(--border-strong)"
-        />
-        <Controls
-          className="!bg-[var(--surface)] !border-[var(--border)] !rounded-xl !shadow-md"
-          showInteractive={false}
-        />
-        <MiniMap
-          nodeColor={minimapNodeColor}
-          maskColor="var(--background)"
-          className="!bg-[var(--surface)] !border-[var(--border)] !rounded-xl !shadow-md"
-          pannable
-          zoomable
-        />
-      </ReactFlow>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          defaultEdgeOptions={defaultEdgeOptions}
+          panOnDrag={panOnDrag}
+          selectionOnDrag={!panOnDrag}
+          fitView
+          fitViewOptions={fitViewOptions}
+          onInit={isPaperLevel
+            ? (instance) => {
+                window.setTimeout(() => {
+                  instance.fitView({ padding: 0.65, minZoom: 0.2, maxZoom: 0.85, duration: 150 });
+                }, 80);
+              }
+            : undefined}
+          minZoom={isPaperLevel ? 0.2 : 0.15}
+          maxZoom={isPaperLevel ? 0.85 : 2.5}
+          proOptions={{ hideAttribution: true }}
+          deleteKeyCode={null}
+        >
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={24}
+            size={1}
+            color="var(--border-strong)"
+          />
+          <Controls
+            className="!bg-[var(--surface)] !border-[var(--border)] !rounded-xl !shadow-md"
+            showInteractive={false}
+          />
+          <MiniMap
+            nodeColor={minimapNodeColor}
+            maskColor="var(--background)"
+            className="!bg-[var(--surface)] !border-[var(--border)] !rounded-xl !shadow-md"
+            pannable
+            zoomable
+          />
+        </ReactFlow>
 
-      {/* ── Top-right toolbar ── */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        {/* ── Top-right toolbar ── */}
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
         <ThemeToggle />
         {challengeSolutionGraph && !isPaperLevel && (
           <SubmitChallengeButton
@@ -911,12 +940,7 @@ function CanvasInner({
             )}
           </div>
         )}
-      </div>
-
-      {/* ── Bottom bar: gradient flow toggle (shortcuts removed for cleaner UI) ── */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-        <GradientFlowToggle nodeIds={nodes.map((n) => n.id)} />
-      </div>
+        </div>
 
       {/* ── Bottom chat bar (design feedback) ── */}
       {!isPaperLevel && (
@@ -1316,51 +1340,6 @@ function InferenceToggle({
   );
 }
 
-// ── Gradient flow toggle button ──
-function GradientFlowToggle({ nodeIds }: { nodeIds: string[] }) {
-  const { enabled, setEnabled, seedDemo, gradients } = useGradientFlow();
-
-  const handleToggle = useCallback(() => {
-    const next = !enabled;
-    setEnabled(next);
-    // Seed demo data if no real gradient data exists yet.
-    if (next && gradients.size === 0 && nodeIds.length > 0) {
-      seedDemo(nodeIds);
-    }
-  }, [enabled, setEnabled, seedDemo, gradients.size, nodeIds]);
-
-  return (
-    <button
-      onClick={handleToggle}
-      className={`
-        flex items-center gap-2 px-3 py-1.5 rounded-full
-        border text-[11px] font-medium
-        transition-all duration-200 select-none shadow-sm
-        ${
-          enabled
-            ? "bg-[var(--success-muted)] border-[var(--success)] text-[var(--success)]"
-            : "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground-secondary)] hover:border-[var(--border-strong)] hover:shadow-md"
-        }
-      `}
-      title={enabled ? "Hide gradient flow overlay" : "Show gradient flow overlay on canvas"}
-    >
-      <svg
-        width="12"
-        height="12"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-      </svg>
-      {enabled ? "Gradient Flow ON" : "Show Gradient Flow"}
-    </button>
-  );
-}
-
 // ── Renders the modal when a block is being peeped ──
 function PeepInsideOverlay() {
   const { target, close } = usePeepInsideContext();
@@ -1372,6 +1351,7 @@ function PeepInsideOverlay() {
       anchorX={target.anchorX}
       anchorY={target.anchorY}
       activationType={target.activationType}
+      params={target.params}
       onClose={close}
     />
   );
@@ -1438,8 +1418,9 @@ export default function NeuralCanvas({
   return (
     <ReactFlowProvider>
       <ShapeProvider>
-        <PeepInsideProvider>
-          <GradientFlowProvider>
+        <PredictionProvider>
+          <PeepInsideProvider>
+            <GradientFlowProvider>
             <div className="w-full h-full min-h-0 bg-neural-bg">
               <CanvasInner
                 initialNodes={effectiveInitialNodes}
@@ -1454,8 +1435,9 @@ export default function NeuralCanvas({
                 paperStepIndex={paperStepIndex ?? undefined}
               />
             </div>
-          </GradientFlowProvider>
-        </PeepInsideProvider>
+            </GradientFlowProvider>
+          </PeepInsideProvider>
+        </PredictionProvider>
       </ShapeProvider>
     </ReactFlowProvider>
   );

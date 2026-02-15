@@ -324,6 +324,41 @@ export async function fetchDatasets(): Promise<
   return res.json();
 }
 
+/** Fallback class labels only when API does not return class_names for a dataset. */
+const KNOWN_DATASET_LABELS_FALLBACK: Record<string, string[]> = {
+  mnist: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+  fashion_mnist: [
+    "T-shirt/top", "Trouser", "Pullover", "Dress", "Coat",
+    "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot",
+  ],
+  cifar10: [
+    "airplane", "automobile", "bird", "cat", "deer",
+    "dog", "frog", "horse", "ship", "truck",
+  ],
+};
+
+/**
+ * Fetch human-readable class labels for the dataset selected in the Input block.
+ * Always tries the API first (GET /api/datasets/:id) so labels come from the
+ * actual dataset; only falls back to known labels if the API fails or returns none.
+ */
+export async function getClassLabelsForDataset(datasetId: string): Promise<string[]> {
+  if (!datasetId || datasetId === "__custom__") return [];
+  const base = getApiBase();
+  try {
+    const res = await fetch(`${base}/api/datasets/${encodeURIComponent(datasetId)}`);
+    if (res.ok) {
+      const data = (await res.json()) as { class_names?: string[]; labels?: string[] };
+      const names = data.class_names ?? data.labels;
+      if (Array.isArray(names) && names.length > 0) return names;
+    }
+  } catch {
+    // ignore
+  }
+  const fallback = KNOWN_DATASET_LABELS_FALLBACK[datasetId.toLowerCase()];
+  return fallback ?? [];
+}
+
 export async function startTraining(
   graph: GraphSchema,
   datasetId: string,

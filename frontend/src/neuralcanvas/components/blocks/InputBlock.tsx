@@ -1,13 +1,14 @@
 "use client";
 
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { Node, NodeProps } from "@xyflow/react";
-import { useReactFlow } from "@xyflow/react";
+import { useReactFlow, useEdges } from "@xyflow/react";
 import { BaseBlock } from "./BaseBlock";
 import { useShapes } from "@/neuralcanvas/components/canvas/ShapeContext";
 import { getShapeLabel } from "@/neuralcanvas/lib/shapeEngine";
-import { CANVAS_UI_SCALE } from "@/neuralcanvas/lib/canvasConstants";
 import { fetchDatasets } from "@/neuralcanvas/lib/trainingApi";
+
+const CUSTOM_DATASET_ID = "__custom__";
 
 interface BlockData extends Record<string, unknown> {
   params: Record<string, number | string>;
@@ -31,21 +32,30 @@ function InputViz() {
       <polygon points="146,15 152,18 146,21" fill="#F59E0B" opacity="0.85" />
 
       {/* Label */}
-      <text x={90} y={12} fontSize="8" fill="#F59E0B" opacity="0.9" fontWeight="600">
-        Dataset → Training Panel
+      <text x={80} y={12} fontSize="7" fill="#F59E0B" opacity="0.9" fontWeight="600">
+        Data → Training
       </text>
     </svg>
   );
 }
 
 function InputBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
-  const s = CANVAS_UI_SCALE;
   const { shapes } = useShapes();
-  const { setNodes } = useReactFlow();
+  const { setNodes, getNode } = useReactFlow();
+  const edges = useEdges();
   const result = shapes.get(id);
   const outLabel = getShapeLabel(result?.outputShape ?? null);
   const params = data?.params ?? {};
   const datasetId = (params.dataset_id as string) ?? "";
+
+  const hasCustomInputConnected = useMemo(() => {
+    const incoming = edges.filter((e) => e.target === id);
+    for (const e of incoming) {
+      const sourceNode = getNode(e.source);
+      if (sourceNode?.type === "InputSpace" || sourceNode?.type === "Board") return true;
+    }
+    return false;
+  }, [id, edges, getNode]);
 
   const [datasets, setDatasets] = useState<{ id: string; name: string; input_shape: number[] }[]>([]);
   const [datasetError, setDatasetError] = useState<string | null>(null);
@@ -63,7 +73,7 @@ function InputBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>)
   }, []);
 
   useEffect(() => {
-    if (!datasetId || !datasets.length || (params.input_shape as string)?.length) return;
+    if (datasetId === CUSTOM_DATASET_ID || !datasets.length || (params.input_shape as string)?.length) return;
     const match = datasets.find((d) => d.id === datasetId);
     if (!match?.input_shape?.length) return;
     const shapeStr = match.input_shape.join(",");
@@ -76,16 +86,31 @@ function InputBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>)
     );
   }, [datasetId, datasets, id, setNodes, params.input_shape]);
 
+  useEffect(() => {
+    if (hasCustomInputConnected && datasetId !== CUSTOM_DATASET_ID) {
+      setNodes((nds) =>
+        nds.map((n) => {
+          if (n.id !== id) return n;
+          const prevParams = (n.data?.params && typeof n.data.params === "object") ? (n.data.params as Record<string, number | string>) : {};
+          return { ...n, data: { ...n.data, params: { ...prevParams, dataset_id: CUSTOM_DATASET_ID } } };
+        }),
+      );
+    }
+  }, [hasCustomInputConnected, datasetId, id, setNodes]);
+
   const onDatasetChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value;
-      const selectedDataset = datasets.find((d) => d.id === value);
-      const inputShape = selectedDataset?.input_shape?.length ? selectedDataset.input_shape.join(",") : "";
       setNodes((nds) =>
         nds.map((n) => {
           if (n.id !== id) return n;
           const prevParams = (n.data?.params && typeof n.data.params === "object")
             ? (n.data.params as Record<string, number | string>) : {};
+          if (value === CUSTOM_DATASET_ID) {
+            return { ...n, data: { ...n.data, params: { ...prevParams, dataset_id: CUSTOM_DATASET_ID } } };
+          }
+          const selectedDataset = datasets.find((d) => d.id === value);
+          const inputShape = selectedDataset?.input_shape?.length ? selectedDataset.input_shape.join(",") : "";
           return {
             ...n,
             data: {
@@ -99,27 +124,48 @@ function InputBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>)
     [id, setNodes, datasets],
   );
 
+  const displayValue = hasCustomInputConnected ? CUSTOM_DATASET_ID : datasetId;
+  const isCustom = displayValue === CUSTOM_DATASET_ID;
+
   return (
     <BaseBlock id={id} blockType="Input" params={params} selected={!!selected} data={data}>
       <InputViz />
-      <div className="space-y-px mt-0.5 leading-none">
-        <div className="flex items-center justify-between gap-1">
-          <span className="text-[var(--foreground-muted)] font-mono shrink-0" style={{ fontSize: `${7 * s}px` }}>out</span>
-          <span className="font-mono text-[var(--block-input)] truncate min-w-0 opacity-90" style={{ fontSize: `${7 * s}px` }}>{outLabel}</span>
+      <div className="space-y-2 pt-0.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-[var(--foreground-muted)] font-medium shrink-0">
+            Dataset
+          </span>
+          <span className="text-[10px] font-mono text-[var(--foreground-muted)] truncate min-w-0" title="Output shape">
+            {outLabel}
+          </span>
         </div>
         <select
-          value={datasetId}
+          value={displayValue}
           onChange={onDatasetChange}
           disabled={!!datasetError}
-          className="nodrag nopan w-full mt-0.5 px-1 py-1 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--foreground)] font-mono focus:outline-none focus:ring-1 focus:ring-[var(--accent-muted)] disabled:opacity-50 min-h-[18px]"
-          style={{ fontSize: `${8 * s}px` }}
-          title={datasetError ?? "Dataset"}
+          className="
+            nodrag nopan w-full
+            px-2.5 py-1.5 rounded-lg text-[12px] font-medium
+            bg-[var(--surface-elevated)] border border-[var(--border)]
+            text-[var(--foreground)]
+            outline-none focus:border-[var(--block-input)] focus:ring-1 focus:ring-[var(--block-input)]/20
+            disabled:opacity-50 disabled:cursor-not-allowed
+            transition-colors duration-100
+            cursor-pointer
+          "
+          title={isCustom ? "Custom data from Input Space" : datasetError ?? "Choose a dataset for training"}
         >
-          <option value="">Dataset…</option>
+          <option value="">Choose a dataset…</option>
+          <option value={CUSTOM_DATASET_ID}>Custom (from Input Space)</option>
           {datasets.map((d) => (
-            <option key={d.id} value={d.id} style={{ fontSize: `${8 * s}px` }}>{d.name}</option>
+            <option key={d.id} value={d.id}>{d.name}</option>
           ))}
         </select>
+        {isCustom && (
+          <p className="text-[10px] text-[var(--foreground-muted)]">
+            Using custom data from Custom Data block.
+          </p>
+        )}
       </div>
     </BaseBlock>
   );

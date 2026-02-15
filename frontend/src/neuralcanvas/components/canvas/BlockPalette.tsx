@@ -32,6 +32,9 @@ import {
   Hash,
   MapPin,
   Percent,
+  Upload,
+  Monitor,
+  PenTool,
   Search,
   PanelLeftClose,
   PanelLeftOpen,
@@ -63,6 +66,9 @@ const ICON_MAP: Record<string, LucideIcon> = {
   hash: Hash,
   "map-pin": MapPin,
   percent: Percent,
+  upload: Upload,
+  monitor: Monitor,
+  "pen-tool": PenTool,
 };
 
 const CATEGORIES: {
@@ -72,6 +78,7 @@ const CATEGORIES: {
   color: string;
 }[] = [
   { key: "input", label: "Input", icon: Inbox, color: "var(--block-input)" },
+  { key: "data", label: "Data", icon: Upload, color: "#D97706" },
   { key: "output", label: "Output", icon: Target, color: "var(--block-output)" },
   { key: "layer", label: "Layers", icon: Layers, color: "var(--block-layer)" },
   { key: "activation", label: "Activations", icon: Zap, color: "var(--block-activation)" },
@@ -92,9 +99,12 @@ const ESSENTIAL_BLOCK_TYPES = new Set([
 ]);
 
 const FRIENDLY_DESCRIPTIONS: Record<string, string> = {
-  Input: "Where your data enters the model",
+  Input: "Choose a dataset for training. Connect Custom Data block for your own data.",
+  InputSpace: "Upload images, tables, or text, or capture from webcam. Connect to Input for custom data.",
+  Board: "Draw an image with your mouse. Resized to the set dimensions and sent to Input when connected.",
   TextInput: "Where your text data enters the model",
   Output: "Where predictions come out",
+  Display: "LCD-style display for predictions. Shows no-signal static when nothing is connected.",
   Linear: "Connects neurons — the core building block",
   Conv2D: "Finds patterns in images like edges and shapes",
   LSTM: "Remembers patterns over time in sequences",

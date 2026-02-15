@@ -21,6 +21,8 @@ interface PeepTarget {
   anchorY: number;
   /** For Activation blocks, the specific activation function (e.g. "relu"). */
   activationType?: string;
+  /** Block params (e.g. for Input/InputSpace/TextInput to show data preview in Data tab). */
+  params?: Record<string, number | string>;
 }
 
 interface PeepInsideContextValue {

@@ -4,8 +4,11 @@
 
 export { BaseBlock } from "./BaseBlock";
 export { InputBlock } from "./InputBlock";
+export { InputSpaceBlock } from "./InputSpaceBlock";
+export { BoardBlock } from "./BoardBlock";
 export { TextInputBlock } from "./TextInputBlock";
 export { OutputBlock } from "./OutputBlock";
+export { DisplayBlock } from "./DisplayBlock";
 export { LinearBlock } from "./LinearBlock";
 export { Conv2DBlock } from "./Conv2DBlock";
 export { MaxPool2DBlock } from "./MaxPool2DBlock";

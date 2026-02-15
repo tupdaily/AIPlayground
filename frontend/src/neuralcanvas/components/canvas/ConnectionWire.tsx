@@ -24,6 +24,13 @@ import { BLOCK_REGISTRY, type BlockType } from "@/neuralcanvas/lib/blockRegistry
 import { CANVAS_UI_SCALE, SHAPE_LABEL_SCALE } from "@/neuralcanvas/lib/canvasConstants";
 
 // ---------------------------------------------------------------------------
+// Connector dot animation — one source of truth so keyframes match and loop is seamless
+// ---------------------------------------------------------------------------
+const CONNECTOR_DOT_DASH = 4;
+const CONNECTOR_DOT_GAP = 24;
+const CONNECTOR_DOT_PERIOD = CONNECTOR_DOT_DASH + CONNECTOR_DOT_GAP; // 28 — keyframes must use this for seamless loop
+
+// ---------------------------------------------------------------------------
 // Colors for the three states — light theme
 // ---------------------------------------------------------------------------
 
@@ -184,18 +191,19 @@ function ConnectionWireComponent({
         }}
       />
 
-      {/* Animated flow dots on valid connections — uses source block's accent color */}
+      {/* Animated flow dots on valid connections — short dash + round cap = round dots */}
       {wireState === "valid" && (
         <path
           d={edgePath}
           fill="none"
           stroke={accentColor}
-          strokeWidth={2.5}
-          strokeDasharray="3 14"
+          strokeWidth={4}
+          strokeDasharray={`${CONNECTOR_DOT_DASH} ${CONNECTOR_DOT_GAP}`}
           strokeLinecap="round"
-          opacity={0.35}
+          opacity={0.72}
           style={{
             animation: "connectionDotFlow 2s linear infinite",
+            animationDelay: `${-(id.split("").reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0) % 2000) / 1000}s`,
           }}
         />
       )}
@@ -300,15 +308,18 @@ export const ConnectionWire = memo(ConnectionWireComponent);
 
 if (typeof document !== "undefined") {
   const STYLE_ID = "neural-canvas-connection-wire-anim";
-  if (!document.getElementById(STYLE_ID)) {
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = `
-      @keyframes connectionDotFlow {
-        0%   { stroke-dashoffset: 0; }
-        100% { stroke-dashoffset: -60; }
-      }
-    `;
-    document.head.appendChild(style);
+  const PERIOD = CONNECTOR_DOT_PERIOD;
+  let styleEl = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = STYLE_ID;
+    document.head.appendChild(styleEl);
   }
+  // Always sync keyframes so all connectors use the same animation and loop is seamless
+  styleEl.textContent = `
+    @keyframes connectionDotFlow {
+      0%   { stroke-dashoffset: 0; }
+      100% { stroke-dashoffset: -${PERIOD}; }
+    }
+  `;
 }

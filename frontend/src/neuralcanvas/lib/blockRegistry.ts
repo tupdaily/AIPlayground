@@ -5,6 +5,7 @@
 /** Categories that blocks can belong to. */
 export type BlockCategory =
   | "input"
+  | "data"
   | "output"
   | "layer"
   | "normalization"
@@ -37,8 +38,11 @@ export interface BlockPort {
 /** All neural-network block types NeuralCanvas supports. */
 export type BlockType =
   | "Input"
+  | "InputSpace"
+  | "Board"
   | "TextInput"
   | "Output"
+  | "Display"
   | "Linear"
   | "Conv2D"
   | "MaxPool2D"
@@ -90,6 +94,7 @@ export interface BlockDefinition {
 // ---------------------------------------------------------------------------
 const CATEGORY_COLORS: Record<BlockCategory, string> = {
   input: "#F59E0B",        // amber
+  data: "#D97706",         // darker amber for custom data
   output: "#10B981",       // emerald
   layer: "#6366F1",        // indigo
   normalization: "#14B8A6", // teal
@@ -116,15 +121,48 @@ const BLOCK_COLORS = {
 const INPUT_BLOCK: BlockDefinition = {
   id: "Input",
   type: "Input",
-  label: "Input",
+  label: "Dataset",
   icon: "inbox",
   category: "input",
   defaultParams: {},
   paramSchema: [],
+  inputPorts: [{ id: "in", label: "Custom" }],
+  outputPorts: [{ id: "out", label: "Output" }],
+  color: CATEGORY_COLORS.input,
+  description: "Model input. Use a dataset or connect Input Space for custom data.",
+};
+
+const INPUT_SPACE_BLOCK: BlockDefinition = {
+  id: "InputSpace",
+  type: "InputSpace",
+  label: "Custom Data",
+  icon: "upload",
+  category: "data",
+  defaultParams: { data_type: "image", input_shape: "1,28,28" },
+  paramSchema: [
+    { name: "data_type", type: "select", options: ["image", "table", "text", "webcam"] },
+  ],
   inputPorts: [],
   outputPorts: [{ id: "out", label: "Output" }],
   color: CATEGORY_COLORS.input,
-  description: "Model input. Choose dataset on this block.",
+  description: "Upload images, tables, or text, or capture from webcam. Connect to Input for custom training data.",
+};
+
+const BOARD_BLOCK: BlockDefinition = {
+  id: "Board",
+  type: "Board",
+  label: "Board",
+  icon: "pen-tool",
+  category: "data",
+  defaultParams: { width: 28, height: 28 },
+  paramSchema: [
+    { name: "width", type: "int", min: 8, max: 224 },
+    { name: "height", type: "int", min: 8, max: 224 },
+  ],
+  inputPorts: [],
+  outputPorts: [{ id: "out", label: "Output" }],
+  color: CATEGORY_COLORS.data,
+  description: "Draw an image with your mouse or finger. Output is resized to the dimensions above and connected to Input as custom data.",
 };
 
 const TEXT_INPUT_BLOCK: BlockDefinition = {
@@ -153,9 +191,23 @@ const OUTPUT_BLOCK: BlockDefinition = {
   defaultParams: {},
   paramSchema: [],
   inputPorts: [{ id: "in", label: "Input" }],
+  outputPorts: [{ id: "out", label: "Output" }],
+  color: CATEGORY_COLORS.output,
+  description: "Model output (e.g. logits or loss). Connect to Display to show predictions.",
+};
+
+const DISPLAY_BLOCK: BlockDefinition = {
+  id: "Display",
+  type: "Display",
+  label: "Display",
+  icon: "monitor",
+  category: "output",
+  defaultParams: {},
+  paramSchema: [],
+  inputPorts: [{ id: "in", label: "Input" }],
   outputPorts: [],
   color: CATEGORY_COLORS.output,
-  description: "Sink for model output (e.g. logits or loss).",
+  description: "LCD-style display for predictions. Shows no-signal static when nothing is connected.",
 };
 
 const LINEAR_BLOCK: BlockDefinition = {
@@ -468,8 +520,11 @@ const CONCAT_BLOCK: BlockDefinition = {
  */
 export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
   Input: INPUT_BLOCK,
+  InputSpace: INPUT_SPACE_BLOCK,
+  Board: BOARD_BLOCK,
   TextInput: TEXT_INPUT_BLOCK,
   Output: OUTPUT_BLOCK,
+  Display: DISPLAY_BLOCK,
   Linear: LINEAR_BLOCK,
   Conv2D: CONV2D_BLOCK,
   MaxPool2D: MAXPOOL2D_BLOCK,
