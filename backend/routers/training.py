@@ -198,13 +198,26 @@ async def train_with_runpod_flash(request, ws_callback, stop_event, job_id=None)
 
         # Only pass a callback URL if RunPod can reach this backend (not localhost)
         callback_url = _runpod_callback_url()
-        result = await train_model_flash(
-            graph_dict=request.graph.dict(),
-            dataset_id=request.dataset_id,
-            config_dict=request.training_config.dict(),
-            job_id=job_id,
-            backend_url=callback_url
-        )
+        logger.info(f"Calling RunPod Flash with callback_url={callback_url}")
+
+        try:
+            result = await train_model_flash(
+                graph_dict=request.graph.dict(),
+                dataset_id=request.dataset_id,
+                config_dict=request.training_config.dict(),
+                job_id=job_id,
+                backend_url=callback_url
+            )
+        except Exception as e:
+            logger.error(f"RunPod Flash call failed: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            await ws_callback({
+                "type": "error",
+                "message": f"RunPod error: {str(e)}",
+                "details": traceback.format_exc()
+            })
+            return
 
         logger.info(f"RunPod Flash training completed: {result.get('type')}")
         logger.info(f"RunPod result keys: {result.keys()}")
