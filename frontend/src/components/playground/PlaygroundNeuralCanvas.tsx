@@ -303,9 +303,8 @@ export default function PlaygroundNeuralCanvas({
   const stepGraphNodesEdges = inWalkthrough && currentStep
     ? levelGraphToNeuralCanvas(currentStep.graph, { forceSequentialLayout: true })
     : null;
-  const isNewPlayground = !playgroundId && !levelParam;
-  const initialNodes = stepGraphNodesEdges?.nodes ?? initialGraph?.nodes ?? (isNewPlayground ? [] : undefined);
-  const initialEdges = stepGraphNodesEdges?.edges ?? initialGraph?.edges ?? (isNewPlayground ? [] : undefined);
+  const initialNodes = stepGraphNodesEdges?.nodes ?? initialGraph?.nodes ?? undefined;
+  const initialEdges = stepGraphNodesEdges?.edges ?? initialGraph?.edges ?? undefined;
 
   const canvasKey = inWalkthrough
     ? `${playgroundId ?? levelParam ?? "default"}-walkthrough-step-${walkthroughStepIndex}`

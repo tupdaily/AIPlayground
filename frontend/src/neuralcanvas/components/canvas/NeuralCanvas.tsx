@@ -209,9 +209,15 @@ const INITIAL_NODES: Node[] = [
     data: { params: { in_features: 128, out_features: 10 } },
   },
   {
+    id: "softmax-1",
+    type: "Softmax",
+    position: { x: 60 + INITIAL_NODE_SPACING * 5, y: 200 },
+    data: { params: {} },
+  },
+  {
     id: "output-1",
     type: "Output",
-    position: { x: 60 + INITIAL_NODE_SPACING * 5, y: 200 },
+    position: { x: 60 + INITIAL_NODE_SPACING * 6, y: 200 },
     data: { params: {} },
   },
 ];
@@ -221,7 +227,8 @@ const INITIAL_EDGES: Edge[] = [
   { id: "e-2", source: "flatten-1", target: "linear-1", type: "shape" },
   { id: "e-3", source: "linear-1", target: "activation-1", type: "shape" },
   { id: "e-4", source: "activation-1", target: "linear-2", type: "shape" },
-  { id: "e-5", source: "linear-2", target: "output-1", type: "shape" },
+  { id: "e-5", source: "linear-2", target: "softmax-1", type: "shape" },
+  { id: "e-6", source: "softmax-1", target: "output-1", type: "shape" },
 ];
 
 // ---------------------------------------------------------------------------
