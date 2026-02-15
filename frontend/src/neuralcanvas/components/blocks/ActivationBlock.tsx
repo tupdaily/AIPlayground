@@ -92,7 +92,7 @@ function ActivationBlockComponent({ id, data, selected }: NodeProps<Node<BlockDa
   const fn = String(data?.params?.activation ?? "relu");
 
   return (
-    <BaseBlock id={id} blockType="Activation" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="Activation" params={data?.params ?? {}} selected={!!selected} data={data}>
       <ActivationViz fn={fn} />
     </BaseBlock>
   );

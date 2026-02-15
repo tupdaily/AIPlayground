@@ -100,7 +100,7 @@ function InputBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>)
   );
 
   return (
-    <BaseBlock id={id} blockType="Input" params={params} selected={!!selected}>
+    <BaseBlock id={id} blockType="Input" params={params} selected={!!selected} data={data}>
       <InputViz />
       <div className="space-y-px mt-0.5 leading-none">
         <div className="flex items-center justify-between gap-1">

@@ -36,7 +36,7 @@ function OutputViz() {
 
 function OutputBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
   return (
-    <BaseBlock id={id} blockType="Output" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="Output" params={data?.params ?? {}} selected={!!selected} data={data}>
       <OutputViz />
     </BaseBlock>
   );

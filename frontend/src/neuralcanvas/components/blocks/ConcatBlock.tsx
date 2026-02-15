@@ -41,7 +41,7 @@ function ConcatViz() {
 
 function ConcatBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
   return (
-    <BaseBlock id={id} blockType="Concat" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="Concat" params={data?.params ?? {}} selected={!!selected} data={data}>
       <ConcatViz />
     </BaseBlock>
   );

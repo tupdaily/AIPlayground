@@ -7,6 +7,7 @@ import uuid
 import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from models.schemas import TrainingRequest, GraphSchema, TrainingConfig
+from compiler.normalize_graph import normalize_graph
 from compiler.validator import validate_graph, ValidationError
 from training.trainer import train_model
 from config import settings
@@ -39,13 +40,14 @@ active_connections: dict[str, WebSocket] = {}
 @router.post("/api/training/start")
 async def start_training(request: TrainingRequest):
     """Start a training job. Returns a job_id to connect via WebSocket."""
+    graph = normalize_graph(request.graph)
     try:
-        validate_graph(request.graph)
+        validate_graph(graph)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=e.message)
 
     job_id = str(uuid.uuid4())[:8]
-    pending_jobs[job_id] = request
+    pending_jobs[job_id] = TrainingRequest(graph=graph, dataset_id=request.dataset_id, training_config=request.training_config)
     stop_events[job_id] = asyncio.Event()
 
     return {"job_id": job_id}
@@ -167,7 +169,7 @@ async def training_websocket(websocket: WebSocket, job_id: str):
         else:
             logger.info("Starting local training job_id=%s dataset_id=%s epochs=%s", job_id, request.dataset_id, request.training_config.epochs)
             await train_model(
-                graph=request.graph,
+                graph=request.graph,  # already normalized at start_training
                 dataset_id=request.dataset_id,
                 config=request.training_config,
                 ws_callback=ws_callback,

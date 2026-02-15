@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 from models.schemas import GraphSchema, ValidationResult
+from compiler.normalize_graph import normalize_graph
 from compiler.validator import validate_graph, ValidationError
 from compiler.shape_inference import infer_shapes, ShapeError
 from compiler.model_builder import build_model, count_parameters
@@ -13,6 +14,7 @@ router = APIRouter(prefix="/api/graphs", tags=["graphs"])
 @router.post("/validate", response_model=ValidationResult)
 async def validate(graph: GraphSchema):
     """Validate a graph and return shape information."""
+    graph = normalize_graph(graph)
     try:
         validate_graph(graph)
     except ValidationError as e:

@@ -8,10 +8,10 @@
 export const CANVAS_UI_SCALE = 1.0;
 
 /** Default block width in px (auto-height). Blocks can override via definition.width. */
-export const BLOCK_BASE_WIDTH = 220;
+export const BLOCK_BASE_WIDTH = 260;
 
 /** Legacy compat — kept for any callers but no longer constraining height. */
-export const BLOCK_FIXED_SIZE = 220;
+export const BLOCK_FIXED_SIZE = 260;
 
 /** Scale for shape labels on wires. */
 export const SHAPE_LABEL_SCALE = 1.0;

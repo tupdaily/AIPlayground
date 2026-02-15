@@ -38,6 +38,42 @@ export interface ConnectionValidation {
 }
 
 /**
+ * Infer input-shape-dependent params from upstream shape (e.g. Linear in_features from last dim).
+ * Returns a partial params object to apply when the inferred value is a concrete number.
+ */
+export function inferInputParamsFromShape(
+  nodeType: string,
+  inputShape: Shape,
+): Record<string, number> | null {
+  if (!inputShape?.length) return null;
+  const dim1 = inputShape[1];
+  const dim2 = inputShape[2];
+  const lastDim = inputShape[inputShape.length - 1];
+
+  switch (nodeType) {
+    case "Linear":
+      return typeof lastDim === "number" ? { in_features: lastDim } : null;
+    case "Conv2D":
+      return typeof dim1 === "number" ? { in_channels: dim1 } : null;
+    case "LSTM":
+      return typeof dim2 === "number" ? { input_size: dim2 } : null;
+    case "Attention":
+      return typeof dim2 === "number" ? { embed_dim: dim2 } : null;
+    case "LayerNorm":
+      return typeof lastDim === "number" ? { normalized_shape: lastDim } : null;
+    case "BatchNorm":
+      if (inputShape.length >= 2 && typeof dim1 === "number") return { num_features: dim1 };
+      if (typeof lastDim === "number") return { num_features: lastDim };
+      return null;
+    case "PositionalEncoding":
+    case "PositionalEmbedding":
+      return typeof dim2 === "number" ? { d_model: dim2 } : null;
+    default:
+      return null;
+  }
+}
+
+/**
  * Minimal node representation expected by the engine.
  * Mirrors the subset of React Flow `Node` we actually need.
  */
@@ -222,6 +258,25 @@ function computeBlockShape(
         return Math.floor((size + 2 * p - k) / s) + 1;
       };
       return { outputShape: [batch, cOut, computeDim(h), computeDim(w)] };
+    }
+
+    // ----- MaxPool2D -----
+    case "MaxPool2D": {
+      if (!inputShape) return { outputShape: null, error: "No input connected." };
+      if (inputShape.length !== 4) {
+        return {
+          outputShape: null,
+          error: `MaxPool2D expects 4D input [batch, channels, height, width] but got ${inputShape.length}D ${getShapeLabel(inputShape)}.`,
+        };
+      }
+      const [b, c, hin, win] = inputShape;
+      const k = intParam(params, "kernel_size", 2);
+      const s = intParam(params, "stride", 2);
+      const poolDim = (size: Dim): Dim => {
+        if (typeof size !== "number") return size;
+        return Math.floor((size - k) / s) + 1;
+      };
+      return { outputShape: [b, c, poolDim(hin), poolDim(win)] };
     }
 
     // ----- Flatten -----
@@ -597,6 +652,16 @@ export function validateConnection(
         return {
           valid: false,
           error: `Conv2D in_channels is ${expectedCIn} but source has ${cIn} channels. Set in_channels to ${cIn}.`,
+        };
+      }
+      return { valid: true };
+    }
+
+    case "MaxPool2D": {
+      if (dims !== 4) {
+        return {
+          valid: false,
+          error: `MaxPool2D expects 4D input [batch, channels, height, width] but got ${dims}D ${getShapeLabel(sourceShape)}.`,
         };
       }
       return { valid: true };

@@ -153,7 +153,7 @@ function BatchNormViz() {
 // LayerNorm
 function LayerNormBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
   return (
-    <BaseBlock id={id} blockType={"LayerNorm" as BlockType} params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType={"LayerNorm" as BlockType} params={data?.params ?? {}} selected={!!selected} data={data}>
       <LayerNormViz />
     </BaseBlock>
   );
@@ -164,7 +164,7 @@ export const LayerNormBlock = memo(LayerNormBlockComponent);
 // BatchNorm
 function BatchNormBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
   return (
-    <BaseBlock id={id} blockType={"BatchNorm" as BlockType} params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType={"BatchNorm" as BlockType} params={data?.params ?? {}} selected={!!selected} data={data}>
       <BatchNormViz />
     </BaseBlock>
   );

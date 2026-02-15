@@ -59,7 +59,7 @@ function SoftmaxViz() {
 
 function SoftmaxBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
   return (
-    <BaseBlock id={id} blockType="Softmax" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="Softmax" params={data?.params ?? {}} selected={!!selected} data={data}>
       <SoftmaxViz />
     </BaseBlock>
   );

@@ -9,6 +9,7 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
+  Position,
   type EdgeProps,
 } from "@xyflow/react";
 import { useShapes } from "./ShapeContext";
@@ -37,13 +38,19 @@ function ShapeEdgeComponent({
   const hasError = !!data?.error;
   const errorMsg = (data?.error as string) ?? "";
 
+  const HANDLE_INSET = 10;
+  const srcPos = (sourcePosition ?? Position.Right) as string;
+  const tgtPos = (targetPosition ?? Position.Left) as string;
+  const dx = (p: string) => (p === "left" ? -HANDLE_INSET : p === "right" ? HANDLE_INSET : 0);
+  const dy = (p: string) => (p === "top" ? -HANDLE_INSET : p === "bottom" ? HANDLE_INSET : 0);
+
   const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
+    sourceX: sourceX + dx(srcPos),
+    sourceY: sourceY + dy(srcPos),
+    sourcePosition: sourcePosition ?? Position.Right,
+    targetX: targetX + dx(tgtPos),
+    targetY: targetY + dy(tgtPos),
+    targetPosition: targetPosition ?? Position.Left,
   });
 
   const edgeColor = hasError ? "#ef4444" : "#6366f1";

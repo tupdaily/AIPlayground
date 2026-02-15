@@ -48,7 +48,7 @@ function PositionalEncodingBlockComponent({ id, data, selected }: NodeProps<Node
   const maxLen = Number(data?.params?.max_len ?? 512);
 
   return (
-    <BaseBlock id={id} blockType="PositionalEncoding" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="PositionalEncoding" params={data?.params ?? {}} selected={!!selected} data={data}>
       <PosEncViz maxLen={maxLen} />
     </BaseBlock>
   );

@@ -9,6 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { memo, useMemo } from "react";
+import { motion } from "framer-motion";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import {
   BLOCK_REGISTRY,
@@ -100,6 +101,7 @@ function BlockNodeComponent({ id, type, data, selected }: NodeProps<Node<BlockNo
   const params = data?.params ?? {};
   const Icon = def ? ICON_MAP[def.icon] : null;
   const color = def?.color ?? "#6366F1";
+  const animateFromPalette = !!(data as { animateFromPalette?: boolean })?.animateFromPalette;
 
   const summary = useMemo(
     () => (def ? paramSummary(def, params) : ""),
@@ -117,7 +119,7 @@ function BlockNodeComponent({ id, type, data, selected }: NodeProps<Node<BlockNo
     );
   }
 
-  return (
+  const blockContent = (
     <div
       className={`
         group relative
@@ -220,6 +222,20 @@ function BlockNodeComponent({ id, type, data, selected }: NodeProps<Node<BlockNo
       })}
     </div>
   );
+
+  if (animateFromPalette) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: -120 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+        style={{ width: "100%" }}
+      >
+        {blockContent}
+      </motion.div>
+    );
+  }
+  return blockContent;
 }
 
 export const BlockNode = memo(BlockNodeComponent);

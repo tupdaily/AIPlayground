@@ -47,7 +47,7 @@ function LSTMViz() {
 
 function LSTMBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
   return (
-    <BaseBlock id={id} blockType="LSTM" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="LSTM" params={data?.params ?? {}} selected={!!selected} data={data}>
       <LSTMViz />
     </BaseBlock>
   );

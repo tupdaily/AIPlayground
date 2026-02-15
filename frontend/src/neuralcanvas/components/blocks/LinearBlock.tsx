@@ -48,7 +48,7 @@ function LinearBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>
   const outF = Number(data?.params?.out_features ?? 128);
 
   return (
-    <BaseBlock id={id} blockType="Linear" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="Linear" params={data?.params ?? {}} selected={!!selected} data={data}>
       <LinearViz inF={inF} outF={outF} />
     </BaseBlock>
   );

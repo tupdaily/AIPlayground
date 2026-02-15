@@ -68,7 +68,7 @@ function DropoutBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>
   const p = Number(data?.params?.p ?? 0.5);
 
   return (
-    <BaseBlock id={id} blockType="Dropout" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="Dropout" params={data?.params ?? {}} selected={!!selected} data={data}>
       <DropoutViz dropRate={p} />
     </BaseBlock>
   );

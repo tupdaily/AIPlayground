@@ -1,5 +1,6 @@
 import type { GraphSchema } from "@/types/graph";
 import type { Node, Edge } from "@xyflow/react";
+import { BLOCK_REGISTRY } from "@/neuralcanvas/lib/blockRegistry";
 
 /**
  * Serialize NeuralCanvas React Flow nodes/edges to GraphSchema for saving to Supabase.
@@ -46,6 +47,8 @@ function toNeuralCanvasType(type: string): string {
     output: "Output",
     linear: "Linear",
     conv2d: "Conv2D",
+    maxpool2d: "MaxPool2D",
+    maxpool: "MaxPool2D",
     lstm: "LSTM",
     attention: "Attention",
     layernorm: "LayerNorm",
@@ -61,6 +64,7 @@ function toNeuralCanvasType(type: string): string {
     text_embedding: "TextEmbedding",
     textembedding: "TextEmbedding",
     positionalencoding: "PositionalEncoding",
+    positional_encoding: "PositionalEncoding",
     positional_embedding: "PositionalEmbedding",
     positionalembedding: "PositionalEmbedding",
     softmax: "Softmax",
@@ -71,30 +75,161 @@ function toNeuralCanvasType(type: string): string {
 }
 
 /**
+ * Compute topological layers for a graph. Layer 0 = nodes with no incoming edges
+ * (inputs), layer 1 = nodes whose predecessors are all in layer 0, etc.
+ * Returns an array of node id arrays, one per layer.
+ */
+export function computeTopologicalLayers(
+  nodeIds: string[],
+  edges: { source: string; target: string }[]
+): string[][] {
+  const idSet = new Set(nodeIds);
+  const incoming = new Map<string, Set<string>>();
+  const outgoing = new Map<string, Set<string>>();
+  for (const id of nodeIds) {
+    incoming.set(id, new Set());
+    outgoing.set(id, new Set());
+  }
+  for (const e of edges) {
+    if (idSet.has(e.source) && idSet.has(e.target) && e.source !== e.target) {
+      incoming.get(e.target)!.add(e.source);
+      outgoing.get(e.source)!.add(e.target);
+    }
+  }
+  const layers: string[][] = [];
+  const placed = new Set<string>();
+  let remaining = new Set(nodeIds);
+  while (remaining.size > 0) {
+    const layer: string[] = [];
+    for (const id of remaining) {
+      const deps = incoming.get(id)!;
+      const allPlaced = [...deps].every((d) => placed.has(d));
+      if (allPlaced) layer.push(id);
+    }
+    if (layer.length === 0) {
+      // Cyclic or orphaned nodes; place remaining in last layer
+      layer.push(...remaining);
+    }
+    for (const id of layer) {
+      placed.add(id);
+      remaining.delete(id);
+    }
+    layers.push(layer);
+  }
+  return layers;
+}
+
+/** Normalize params so UI and backend get consistent formats (e.g. Input shape, Conv2D scalars). */
+function normalizeNodeParams(
+  type: string,
+  params: Record<string, unknown>
+): Record<string, number | string> {
+  const p = { ...(params ?? {}) } as Record<string, number | string>;
+  const typeLower = type.toLowerCase();
+
+  if (typeLower === "input") {
+    const raw = p.input_shape ?? p.shape;
+    if (Array.isArray(raw)) {
+      const dims = raw
+        .map((x) => (x == null ? 1 : Number(x)))
+        .filter((n) => Number.isFinite(n));
+      if (dims.length > 0) {
+        // Frontend shape engine expects input_shape as "C,H,W" string
+        p.input_shape = dims.join(",") as unknown as string;
+      }
+    }
+    if (p.input_shape == null) p.input_shape = "1,28,28";
+  }
+
+  if (typeLower === "conv2d") {
+    const k = p.kernel_size;
+    p.kernel_size = Array.isArray(k) ? (k[0] as number) ?? 3 : (typeof k === "number" ? k : parseInt(String(k), 10) || 3);
+    const s = p.stride;
+    p.stride = Array.isArray(s) ? (s[0] as number) ?? 1 : (typeof s === "number" ? s : parseInt(String(s), 10) || 1);
+    const pad = p.padding;
+    if (pad === "same" || String(pad).toLowerCase() === "same") {
+      p.padding = typeof p.kernel_size === "number" ? Math.floor((p.kernel_size as number) / 2) : 1;
+    } else {
+      p.padding = Array.isArray(pad) ? (pad[0] as number) ?? 0 : (typeof pad === "number" ? pad : parseInt(String(pad), 10) || 0);
+    }
+  }
+
+  if (typeLower === "maxpool2d" || typeLower === "maxpool") {
+    const k = p.kernel_size;
+    p.kernel_size = Array.isArray(k) ? (k[0] as number) ?? 2 : (typeof k === "number" ? k : parseInt(String(k), 10) || 2);
+    const s = p.stride;
+    p.stride = Array.isArray(s) ? (s[0] as number) ?? 2 : (typeof s === "number" ? s : parseInt(String(s), 10) || 2);
+  }
+
+  return p;
+}
+
+/** Block types that use in_a/in_b instead of "in" for inputs. */
+const MULTI_INPUT_TYPES = new Set(["Add", "Concat"]);
+
+/**
  * Convert a level's graph_json (GraphSchema) into NeuralCanvas nodes and edges.
+ * Defensive: tolerates missing nodes/edges or malformed schema. Filters edges to
+ * valid node pairs and fixes targetHandle for Add/Concat when LLM sends "in".
  */
 export function levelGraphToNeuralCanvas(schema: GraphSchema): {
   nodes: Node[];
   edges: Edge[];
 } {
-  const nodes: Node[] = schema.nodes.map((n) => ({
-    id: n.id,
-    type: toNeuralCanvasType(n.type),
-    position: n.position ?? { x: 0, y: 0 },
-    data: {
-      params: (n.params ?? {}) as Record<string, number | string>,
-    },
-  }));
+  const rawNodes = Array.isArray(schema?.nodes) ? schema.nodes : [];
+  const nodes: Node[] = rawNodes
+    .map((n) => {
+      const typeStr = typeof n?.type === "string" ? n.type : "Input";
+      const canonicalType = toNeuralCanvasType(typeStr);
+      if (!canonicalType || !(canonicalType in BLOCK_REGISTRY)) return null;
+      const params = normalizeNodeParams(typeStr, (n?.params && typeof n.params === "object" ? n.params : {}) as Record<string, unknown>);
+      return {
+        id: String(n?.id ?? `node-${Math.random().toString(36).slice(2, 9)}`),
+        type: canonicalType,
+        position: n?.position && typeof n.position === "object" ? { x: Number(n.position.x) || 0, y: Number(n.position.y) || 0 } : { x: 0, y: 0 },
+        data: {
+          params: params as Record<string, number | string>,
+        },
+      };
+    })
+    .filter((n): n is Node => n !== null);
 
-  const edges: Edge[] = (schema.edges ?? []).map((e) => ({
-    id: e.id ?? `e-${e.source}-${e.target}`,
-    source: e.source,
-    target: e.target,
-    sourceHandle: e.sourceHandle ?? "out",
-    targetHandle: e.targetHandle ?? "in",
-    type: "shape",
-    animated: false,
-  }));
+  const nodeIds = new Set(nodes.map((n) => n.id));
+
+  const rawEdges = Array.isArray(schema?.edges) ? schema.edges : [];
+  const edgesForHandleFix: { e: (typeof rawEdges)[0]; targetType: string }[] = rawEdges
+    .filter((e) => {
+      const src = String(e?.source ?? "");
+      const tgt = String(e?.target ?? "");
+      return src && tgt && nodeIds.has(src) && nodeIds.has(tgt);
+    })
+    .map((e) => {
+      const tgtId = String(e?.target ?? "");
+      const targetNode = nodes.find((n) => n.id === tgtId);
+      const targetType = (targetNode?.type as string) ?? "";
+      return { e, targetType };
+    });
+
+  const inPortCount = new Map<string, number>();
+  const edges: Edge[] = edgesForHandleFix.map(({ e, targetType }) => {
+    let targetHandle = (e?.targetHandle as string) ?? "in";
+    if (MULTI_INPUT_TYPES.has(targetType)) {
+      if (targetHandle !== "in_a" && targetHandle !== "in_b") {
+        const count = (inPortCount.get(String(e?.target ?? "")) ?? 0);
+        inPortCount.set(String(e?.target ?? ""), count + 1);
+        targetHandle = count === 0 ? "in_a" : "in_b";
+      }
+    }
+    return {
+      id: (e?.id as string) ?? `e-${e?.source}-${e?.target}`,
+      source: String(e?.source ?? ""),
+      target: String(e?.target ?? ""),
+      sourceHandle: (e?.sourceHandle as string) ?? "out",
+      targetHandle,
+      type: "shape",
+      animated: false,
+    };
+  });
 
   return { nodes, edges };
 }

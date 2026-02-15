@@ -58,7 +58,7 @@ function TextEmbeddingBlockComponent({ id, data, selected }: NodeProps<Node<Bloc
   const dim = Number(data?.params?.embedding_dim ?? 128);
 
   return (
-    <BaseBlock id={id} blockType="TextEmbedding" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="TextEmbedding" params={data?.params ?? {}} selected={!!selected} data={data}>
       <TextEmbeddingViz vocabSize={vocabSize} dim={dim} />
     </BaseBlock>
   );

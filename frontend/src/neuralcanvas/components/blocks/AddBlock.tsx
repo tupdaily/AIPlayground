@@ -35,7 +35,7 @@ function AddViz() {
 
 function AddBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
   return (
-    <BaseBlock id={id} blockType="Add" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="Add" params={data?.params ?? {}} selected={!!selected} data={data}>
       <AddViz />
     </BaseBlock>
   );

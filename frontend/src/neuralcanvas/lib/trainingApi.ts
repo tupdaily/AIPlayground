@@ -76,9 +76,12 @@ function toBackendNodeType(
   switch (frontendType) {
     case "Input": {
       let shape: number[] = [1, 28, 28];
-      const shapeStr = params.input_shape;
-      if (typeof shapeStr === "string" && shapeStr.trim().length > 0) {
-        const dims = shapeStr.split(",").map((x) => parseInt(String(x).trim(), 10)).filter((n) => Number.isFinite(n));
+      const raw = params.input_shape ?? params.shape;
+      if (typeof raw === "string" && raw.trim().length > 0) {
+        const dims = raw.split(",").map((x) => parseInt(String(x).trim(), 10)).filter((n) => Number.isFinite(n));
+        if (dims.length > 0) shape = dims;
+      } else if (Array.isArray(raw)) {
+        const dims = raw.map((x) => (x == null ? 1 : Number(x))).filter((n) => Number.isFinite(n));
         if (dims.length > 0) shape = dims;
       }
       return { type: "input", params: { ...params, shape } };
@@ -99,16 +102,38 @@ function toBackendNodeType(
           bias: params.bias ?? true,
         },
       };
-    case "Conv2D":
+    case "Conv2D": {
+      const kRaw = params.kernel_size ?? 3;
+      const kernelSize = Array.isArray(kRaw) ? (kRaw[0] as number) ?? 3 : (typeof kRaw === "number" ? kRaw : parseInt(String(kRaw), 10) || 3);
+      const sRaw = params.stride ?? 1;
+      const stride = Array.isArray(sRaw) ? (sRaw[0] as number) ?? 1 : (typeof sRaw === "number" ? sRaw : parseInt(String(sRaw), 10) || 1);
+      const padRaw = params.padding ?? 0;
+      const padding =
+        padRaw === "same" || String(padRaw).toLowerCase() === "same"
+          ? Math.floor(kernelSize / 2)
+          : Array.isArray(padRaw)
+            ? (padRaw[0] as number) ?? 0
+            : (typeof padRaw === "number" ? padRaw : parseInt(String(padRaw), 10) || 0);
       return {
         type: "conv2d",
         params: {
           out_channels: params.out_channels ?? 32,
-          kernel_size: params.kernel_size ?? 3,
-          stride: params.stride ?? 1,
-          padding: params.padding ?? 0,
+          kernel_size: kernelSize,
+          stride,
+          padding,
         },
       };
+    }
+    case "MaxPool2D": {
+      const kRaw = params.kernel_size ?? 2;
+      const kernelSize = Array.isArray(kRaw) ? (kRaw[0] as number) ?? 2 : (typeof kRaw === "number" ? kRaw : parseInt(String(kRaw), 10) || 2);
+      const sRaw = params.stride ?? kernelSize;
+      const stride = Array.isArray(sRaw) ? (sRaw[0] as number) ?? kernelSize : (typeof sRaw === "number" ? sRaw : parseInt(String(sRaw), 10) || kernelSize);
+      return {
+        type: "maxpool2d",
+        params: { kernel_size: kernelSize, stride },
+      };
+    }
     case "Flatten":
       return { type: "flatten", params: {} };
     case "Activation": {

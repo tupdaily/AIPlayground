@@ -16,7 +16,7 @@ function Conv2DViz({ kernelSize }: { kernelSize: number }) {
   const w = 160, h = 56;
   const startX = (w - gridSize * (cellSize + gap)) / 2;
   const startY = (h - gridSize * (cellSize + gap)) / 2;
-  const k = Math.min(kernelSize, gridSize);
+  const k = Math.min(Math.max(1, Number.isFinite(kernelSize) ? kernelSize : 3), gridSize);
 
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
@@ -60,10 +60,11 @@ function Conv2DViz({ kernelSize }: { kernelSize: number }) {
 }
 
 function Conv2DBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
-  const kernelSize = Number(data?.params?.kernel_size ?? 3);
+  const raw = Number(data?.params?.kernel_size ?? 3);
+  const kernelSize = Number.isFinite(raw) && raw >= 1 ? raw : 3;
 
   return (
-    <BaseBlock id={id} blockType="Conv2D" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="Conv2D" params={data?.params ?? {}} selected={!!selected} data={data}>
       <Conv2DViz kernelSize={kernelSize} />
     </BaseBlock>
   );

@@ -12,6 +12,7 @@ import {
   type ReactNode,
   type ChangeEvent,
 } from "react";
+import { motion } from "framer-motion";
 import { Handle, Position, useReactFlow } from "@xyflow/react";
 import {
   BLOCK_REGISTRY,
@@ -267,6 +268,8 @@ export interface BaseBlockProps {
   blockType: BlockType;
   params: Record<string, number | string>;
   selected: boolean;
+  /** Node data (e.g. for animateFromPalette entrance animation) */
+  data?: Record<string, unknown>;
   /** Unique visual content (SVG illustration) injected by each block type */
   children?: ReactNode;
 }
@@ -280,6 +283,7 @@ function BaseBlockComponent({
   blockType,
   params,
   selected,
+  data,
   children,
 }: BaseBlockProps) {
   const def: BlockDefinition | undefined = BLOCK_REGISTRY[blockType];
@@ -344,7 +348,8 @@ function BaseBlockComponent({
     );
   }
 
-  return (
+  const animateFromPalette = !!(data as { animateFromPalette?: boolean } | undefined)?.animateFromPalette;
+  const blockContent = (
     <div
       className={`
         group/block relative flex flex-col
@@ -514,6 +519,23 @@ function BaseBlockComponent({
       })}
     </div>
   );
+
+  // Opacity-only animation: avoids translateX/translateY which would shift handles
+  // during animation and break React Flow's cached handle positions (connections
+  // would stop short of the visible handle circles).
+  if (animateFromPalette) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        style={{ width: "100%" }}
+      >
+        {blockContent}
+      </motion.div>
+    );
+  }
+  return blockContent;
 }
 
 export const BaseBlock = memo(BaseBlockComponent);

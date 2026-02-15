@@ -55,7 +55,7 @@ function TextInputBlockComponent({ id, data, selected }: NodeProps<Node<BlockDat
   const seqLen = Number(data?.params?.seq_len ?? 128);
 
   return (
-    <BaseBlock id={id} blockType="TextInput" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="TextInput" params={data?.params ?? {}} selected={!!selected} data={data}>
       <TextInputViz seqLen={seqLen} />
     </BaseBlock>
   );

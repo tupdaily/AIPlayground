@@ -62,7 +62,7 @@ function AttentionBlockComponent({ id, data, selected }: NodeProps<Node<BlockDat
   const numHeads = Number(data?.params?.num_heads ?? 8);
 
   return (
-    <BaseBlock id={id} blockType="Attention" params={data?.params ?? {}} selected={!!selected}>
+    <BaseBlock id={id} blockType="Attention" params={data?.params ?? {}} selected={!!selected} data={data}>
       <AttentionViz numHeads={numHeads} />
     </BaseBlock>
   );

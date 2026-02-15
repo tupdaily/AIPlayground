@@ -41,6 +41,7 @@ export type BlockType =
   | "Output"
   | "Linear"
   | "Conv2D"
+  | "MaxPool2D"
   | "LSTM"
   | "Attention"
   | "LayerNorm"
@@ -198,6 +199,23 @@ const CONV2D_BLOCK: BlockDefinition = {
   outputPorts: [{ id: "out", label: "Output" }],
   color: BLOCK_COLORS.Conv2D,
   description: "2-D convolutional layer for spatial feature extraction.",
+};
+
+const MAXPOOL2D_BLOCK: BlockDefinition = {
+  id: "MaxPool2D",
+  type: "MaxPool2D",
+  label: "MaxPool2D",
+  icon: "grid-3x3",
+  category: "layer",
+  defaultParams: { kernel_size: 2, stride: 2 },
+  paramSchema: [
+    { name: "kernel_size", type: "int", min: 1, max: 31 },
+    { name: "stride", type: "int", min: 1, max: 16 },
+  ],
+  inputPorts: [{ id: "in", label: "Input", expectedDims: 4 }],
+  outputPorts: [{ id: "out", label: "Output" }],
+  color: BLOCK_COLORS.Conv2D,
+  description: "2-D max pooling. Reduces spatial dimensions. Input: 4D [B, C, H, W].",
 };
 
 const LSTM_BLOCK: BlockDefinition = {
@@ -454,6 +472,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
   Output: OUTPUT_BLOCK,
   Linear: LINEAR_BLOCK,
   Conv2D: CONV2D_BLOCK,
+  MaxPool2D: MAXPOOL2D_BLOCK,
   LSTM: LSTM_BLOCK,
   Attention: ATTENTION_BLOCK,
   LayerNorm: LAYERNORM_BLOCK,

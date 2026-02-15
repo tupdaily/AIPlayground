@@ -10,6 +10,7 @@ import {
   EdgeLabelRenderer,
   getBezierPath,
   useNodes,
+  Position,
   type EdgeProps,
 } from "@xyflow/react";
 import { useShapes } from "./ShapeContext";
@@ -140,13 +141,25 @@ function ConnectionWireComponent({
     BLOCK_REGISTRY[targetNode?.type as BlockType]?.label ?? targetNode?.type ?? "?";
   const accentColor = getSourceColor(sourceNode?.type);
 
+  // Extend path into handles so lines reach the center of the visible circles
+  // Handles: 10px box + 2.5px border + 2px shadow each side → radius ~9px
+  const HANDLE_INSET = 10;
+  const srcPos = (sourcePosition ?? Position.Right) as string;
+  const tgtPos = (targetPosition ?? Position.Left) as string;
+  const dx = (p: string) => (p === "left" ? -HANDLE_INSET : p === "right" ? HANDLE_INSET : 0);
+  const dy = (p: string) => (p === "top" ? -HANDLE_INSET : p === "bottom" ? HANDLE_INSET : 0);
+  const insetSourceX = sourceX + dx(srcPos);
+  const insetSourceY = sourceY + dy(srcPos);
+  const insetTargetX = targetX + dx(tgtPos);
+  const insetTargetY = targetY + dy(tgtPos);
+
   const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
+    sourceX: insetSourceX,
+    sourceY: insetSourceY,
+    sourcePosition: sourcePosition ?? Position.Right,
+    targetX: insetTargetX,
+    targetY: insetTargetY,
+    targetPosition: targetPosition ?? Position.Left,
   });
 
   const description = useMemo(() => {

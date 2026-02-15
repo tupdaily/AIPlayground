@@ -4,7 +4,7 @@
 // NeuralCanvas — main React Flow canvas component
 // ---------------------------------------------------------------------------
 
-import {
+import React, {
   useCallback,
   useEffect,
   useMemo,
@@ -33,12 +33,13 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
+import { BLOCK_BASE_WIDTH } from "@/neuralcanvas/lib/canvasConstants";
 import {
   BLOCK_REGISTRY,
   getBlockDefaults,
   type BlockType,
 } from "@/neuralcanvas/lib/blockRegistry";
-import { validateConnection } from "@/neuralcanvas/lib/shapeEngine";
+import { validateConnection, inferInputParamsFromShape } from "@/neuralcanvas/lib/shapeEngine";
 import { ShapeProvider, useShapes } from "./ShapeContext";
 import { ConnectionWire } from "./ConnectionWire";
 import { BlockPalette, DRAG_BLOCK_TYPE } from "./BlockPalette";
@@ -54,7 +55,7 @@ import {
   GradientFlowProvider,
   useGradientFlow,
 } from "@/neuralcanvas/components/peep-inside/GradientFlowContext";
-import { neuralCanvasToGraphSchema, graphsMatchStructurally } from "@/lib/levelGraphAdapter";
+import { neuralCanvasToGraphSchema, levelGraphToNeuralCanvas, graphsMatchStructurally, computeTopologicalLayers } from "@/lib/levelGraphAdapter";
 import type { GraphSchema } from "@/types/graph";
 import { createPlayground, updatePlayground, getPlayground } from "@/lib/supabase/playgrounds";
 import { upsertPaperProgress } from "@/lib/supabase/paperProgress";
@@ -69,6 +70,7 @@ import {
   OutputBlock,
   LinearBlock,
   Conv2DBlock,
+  MaxPool2DBlock,
   LSTMBlock,
   AttentionBlock,
   LayerNormBlock,
@@ -91,6 +93,17 @@ import {
 
 // Task label shown on canvas for challenges; scales with zoom, coverable by other nodes
 const CHALLENGE_TASK_NODE_TYPE = "challengeTask";
+
+// Suggested architecture from AI: nodes get this prefix; box wraps them with Accept/Decline
+const SUGGESTED_PREFIX = "gen-";
+/** Estimated height per block for bbox (blocks are auto-height; use a safe upper bound). */
+const SUGGESTION_BLOCK_HEIGHT = 140;
+
+const SuggestionContext = React.createContext<{
+  pendingSuggestionIds: string[] | null;
+  onAcceptSuggestion: () => void;
+  onDeclineSuggestion: () => void;
+} | null>(null);
 
 function ChallengeTaskNode({ data }: NodeProps<Node<{ task?: string; isPaperLevel?: boolean }>>) {
   const task = data?.task?.trim();
@@ -126,6 +139,7 @@ const nodeTypes: NodeTypes = {
   Output: OutputBlock,
   Linear: LinearBlock,
   Conv2D: Conv2DBlock,
+  MaxPool2D: MaxPool2DBlock,
   LSTM: LSTMBlock,
   Attention: AttentionBlock,
   LayerNorm: LayerNormBlock,
@@ -244,11 +258,18 @@ function CanvasInner({
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const idCounter = useRef(100);
   const reactFlowInstance = useReactFlow();
+  const suggestionAnimationRef = useRef<{
+    newNodes: Node[];
+    newEdges: Edge[];
+    layers: string[][];
+  } | null>(null);
+  const [suggestionAnimationTrigger, setSuggestionAnimationTrigger] = useState<number | null>(null);
+  const [pendingSuggestionIds, setPendingSuggestionIds] = useState<string[] | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [submitResult, setSubmitResult] = useState<"idle" | "correct" | "wrong">("idle");
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackMessages, setFeedbackMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
-  const [feedbackChatOpen, setFeedbackChatOpen] = useState(false);
+  const [feedbackChatOpen, setFeedbackChatOpen] = useState(true);
 
   // ── Load chat history from Supabase when playground loads ──
   useEffect(() => {
@@ -278,6 +299,53 @@ function CanvasInner({
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // ── Animate suggested blocks layer-by-layer (as if dragged from sidebar) ──
+  useEffect(() => {
+    const pending = suggestionAnimationRef.current;
+    if (!pending || suggestionAnimationTrigger === null) return;
+
+    let layerIndex = 0;
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    const scheduleNext = () => {
+      if (layerIndex >= pending.layers.length) {
+        suggestionAnimationRef.current = null;
+        setSuggestionAnimationTrigger(null);
+        return;
+      }
+      const layerIds = new Set<string>(pending.layers[layerIndex]!);
+      const placedIds = new Set(pending.layers.slice(0, layerIndex).flat());
+      const nodesToAdd = [...layerIds]
+        .map((id: string) => pending.newNodes.find((n: Node) => n.id === id))
+        .filter((n): n is Node => !!n)
+        .map((n) => ({ ...n, data: { ...n.data, animateFromPalette: true } }));
+      const edgesToAdd = pending.newEdges.filter(
+        (e) => layerIds.has(e.target) && placedIds.has(e.source)
+      );
+      // Add nodes first so React Flow can measure them before computing edge paths.
+      // User connections work because both nodes exist before the edge is created.
+      setNodes((nds) => [...nds, ...nodesToAdd]);
+      // Defer edge addition so handle positions are available when ConnectionWire renders.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setEdges((eds) => [...eds, ...edgesToAdd]);
+        });
+      });
+      layerIndex++;
+      if (layerIndex < pending.layers.length) {
+        const t = setTimeout(scheduleNext, 550);
+        timeouts.push(t);
+      } else {
+        suggestionAnimationRef.current = null;
+        setSuggestionAnimationTrigger(null);
+      }
+    };
+
+    const t = setTimeout(scheduleNext, 320);
+    timeouts.push(t);
+    return () => timeouts.forEach((id) => clearTimeout(id));
+  }, [suggestionAnimationTrigger, setNodes, setEdges]);
 
   // ── Drag-and-drop from palette ──
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -319,6 +387,38 @@ function CanvasInner({
   useEffect(() => {
     recompute(nodes, edges);
   }, [nodes, edges, recompute]);
+
+  // ── Infer input-shape-dependent params from upstream (e.g. Linear in_features from Flatten output) ──
+  useEffect(() => {
+    const updates = new Map<string, Record<string, number>>();
+    for (const node of nodes) {
+      if (node.type === CHALLENGE_TASK_NODE_TYPE) continue;
+      const result = shapes.get(node.id);
+      const inputShape = result?.inputShape ?? null;
+      if (!inputShape?.length) continue;
+      const inferred = inferInputParamsFromShape(node.type as string, inputShape);
+      if (!inferred) continue;
+      const params = (node.data?.params ?? {}) as Record<string, number | string>;
+      const needsUpdate = Object.entries(inferred).some(([key, value]) => {
+        const cur = params[key];
+        const num = typeof cur === "number" ? cur : parseInt(String(cur), 10);
+        return !Number.isFinite(num) || num !== value;
+      });
+      if (needsUpdate) updates.set(node.id, inferred);
+    }
+    if (!updates.size) return;
+    setNodes((nds) =>
+      nds.map((n) => {
+        const patch = updates.get(n.id);
+        if (!patch) return n;
+        const params = (n.data?.params ?? {}) as Record<string, number | string>;
+        return {
+          ...n,
+          data: { ...n.data, params: { ...params, ...patch } },
+        };
+      })
+    );
+  }, [shapes, nodes, setNodes]);
 
   // ── Sync edge validation with current shapes and params (fixes stale error after user adjusts in_features etc.) ──
   useEffect(() => {
@@ -496,7 +596,7 @@ function CanvasInner({
   // ── Get feedback (chat) ──
   const handleFeedbackSend = useCallback(
     async (userMessage: string) => {
-      if (nodes.length === 0 || !userMessage.trim()) return;
+      if (!userMessage.trim()) return;
       const trimmed = userMessage.trim();
       const newMessages: { role: "user" | "assistant"; content: string }[] = [
         ...feedbackMessages,
@@ -534,6 +634,57 @@ function CanvasInner({
         if (effectivePlaygroundId) {
           insertChatMessage(effectivePlaygroundId, "assistant", assistantContent).catch(() => {});
         }
+
+        // If the API returned a suggested graph, add it below the user's design with a dashed-border box and Accept/Decline.
+        // Animate blocks in layer-by-layer (as if dragged from the sidebar) instead of all at once.
+        const suggested = data.suggested_graph as GraphSchema | undefined;
+        if (suggested?.nodes?.length && suggested?.edges) {
+          let suggestedNodes: Node[];
+          let suggestedEdges: Edge[];
+          try {
+            const converted = levelGraphToNeuralCanvas(suggested);
+            suggestedNodes = converted.nodes;
+            suggestedEdges = converted.edges;
+          } catch (err) {
+            console.warn("Failed to decode suggested graph:", err);
+            suggestedNodes = [];
+            suggestedEdges = [];
+          }
+          if (suggestedNodes.length > 0 && suggestedEdges.length >= 0) {
+          const maxY =
+            nodes.length === 0
+              ? 400
+              : Math.max(...nodes.map((n) => n.position.y + SUGGESTION_BLOCK_HEIGHT)) + 80;
+          const minSuggestedY = Math.min(...suggestedNodes.map((n) => n.position.y));
+          const offsetY = maxY - minSuggestedY;
+
+          const idMap = new Map<string, string>();
+          suggestedNodes.forEach((n) => idMap.set(n.id, SUGGESTED_PREFIX + n.id));
+
+          const newNodes = suggestedNodes.map((n) => ({
+            ...n,
+            id: idMap.get(n.id) ?? n.id,
+            position: { x: n.position.x, y: n.position.y + offsetY },
+          }));
+          const newEdges = suggestedEdges.map((e) => ({
+            ...e,
+            id: SUGGESTED_PREFIX + (e.id ?? `e-${e.source}-${e.target}`),
+            source: idMap.get(e.source) ?? e.source,
+            target: idMap.get(e.target) ?? e.target,
+          }));
+
+          const suggestedIds = newNodes.map((n) => n.id);
+          const layers = computeTopologicalLayers(
+            suggestedIds,
+            newEdges.map((e) => ({ source: e.source, target: e.target }))
+          );
+
+          takeSnapshot(nodes, edges);
+          setPendingSuggestionIds(suggestedIds);
+          suggestionAnimationRef.current = { newNodes, newEdges, layers };
+          setSuggestionAnimationTrigger(Date.now());
+          }
+        }
       } catch (e) {
         const assistantContent = e instanceof Error ? e.message : "Failed to get feedback.";
         setFeedbackMessages((m) => [...m, { role: "assistant", content: assistantContent }]);
@@ -544,7 +695,7 @@ function CanvasInner({
         setFeedbackLoading(false);
       }
     },
-    [nodes, edges, effectivePlaygroundId, feedbackMessages]
+    [nodes, edges, playgroundId, feedbackMessages]
   );
 
   // ── Keyboard shortcuts ──
@@ -638,7 +789,32 @@ function CanvasInner({
     return BLOCK_REGISTRY[blockType]?.color ?? "#6366f1";
   }, []);
 
+  const onAcceptSuggestion = useCallback(() => {
+    setPendingSuggestionIds(null);
+  }, []);
+
+  const onDeclineSuggestion = useCallback(() => {
+    if (!pendingSuggestionIds?.length) return;
+    const idSet = new Set(pendingSuggestionIds);
+    takeSnapshot(nodes, edges);
+    setNodes((nds) => nds.filter((n) => !idSet.has(n.id)));
+    setEdges((eds) =>
+      eds.filter((e) => !idSet.has(e.source) && !idSet.has(e.target))
+    );
+    setPendingSuggestionIds(null);
+  }, [pendingSuggestionIds, nodes, edges, takeSnapshot, setNodes, setEdges]);
+
+  const suggestionContextValue = useMemo(
+    () => ({
+      pendingSuggestionIds,
+      onAcceptSuggestion,
+      onDeclineSuggestion,
+    }),
+    [pendingSuggestionIds, onAcceptSuggestion, onDeclineSuggestion]
+  );
+
   return (
+    <SuggestionContext.Provider value={suggestionContextValue}>
     <div className="flex w-full h-full">
       {/* ── Block Palette ── */}
       <BlockPalette />
@@ -663,7 +839,7 @@ function CanvasInner({
         panOnDrag={panOnDrag}
         selectionOnDrag={!panOnDrag}
         fitView
-        fitViewOptions={{ padding: 0.3 }}
+        fitViewOptions={{ padding: 0.2 }}
         minZoom={0.15}
         maxZoom={2.5}
         proOptions={{ hideAttribution: true }}
@@ -697,17 +873,6 @@ function CanvasInner({
             onSubmit={handleSubmitChallenge}
             result={submitResult}
             disabled={nodes.filter((n) => n.type !== CHALLENGE_TASK_NODE_TYPE).length === 0}
-          />
-        )}
-        {!isPaperLevel && (
-          <FeedbackButton
-            onSend={handleFeedbackSend}
-            loading={feedbackLoading}
-            disabled={nodes.length === 0}
-            messages={feedbackMessages}
-            chatOpen={feedbackChatOpen}
-            onOpenChat={() => setFeedbackChatOpen(true)}
-            onCloseChat={() => setFeedbackChatOpen(false)}
           />
         )}
         <SaveButton
@@ -749,36 +914,51 @@ function CanvasInner({
       </div>
 
       {/* ── Bottom bar: gradient flow toggle (shortcuts removed for cleaner UI) ── */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
         <GradientFlowToggle nodeIds={nodes.map((n) => n.id)} />
       </div>
+
+      {/* ── Bottom chat bar (design feedback) ── */}
+      {!isPaperLevel && (
+        <ChatBar
+          onSend={handleFeedbackSend}
+          loading={feedbackLoading}
+          disabled={false}
+          messages={feedbackMessages}
+          open={feedbackChatOpen}
+          onOpen={() => setFeedbackChatOpen(true)}
+          onClose={() => setFeedbackChatOpen(false)}
+        />
+      )}
       </div>
 
       {/* ── Peep Inside Modal ── */}
       <PeepInsideOverlay />
     </div>
+    </SuggestionContext.Provider>
   );
 }
 
-// ── Feedback button + chat panel ──
-function FeedbackButton({
+// ── Bottom chat bar (design feedback) ──
+function ChatBar({
   onSend,
   loading,
   disabled,
   messages,
-  chatOpen,
-  onOpenChat,
-  onCloseChat,
+  open,
+  onOpen,
+  onClose,
 }: {
   onSend: (text: string) => void;
   loading: boolean;
   disabled: boolean;
   messages: { role: "user" | "assistant"; content: string }[];
-  chatOpen: boolean;
-  onOpenChat: () => void;
-  onCloseChat: () => void;
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
 }) {
   const [input, setInput] = useState("");
+  const suggestionCtx = React.useContext(SuggestionContext);
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent) => {
@@ -802,99 +982,128 @@ function FeedbackButton({
   );
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={chatOpen ? onCloseChat : onOpenChat}
-        disabled={disabled}
-        className={`
-          flex items-center gap-2 px-3 py-1.5 rounded-full
-          border text-[11px] font-medium
-          transition-all duration-200 select-none shadow-sm
-          ${
-            disabled
-              ? "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-muted)] cursor-not-allowed opacity-70"
-              : chatOpen
-                ? "bg-[var(--accent-muted)] border-[var(--accent)] text-[var(--accent)]"
-                : "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:border-[var(--border-strong)] hover:shadow-md"
-          }
-        `}
-        title={disabled ? "Add blocks for feedback" : "Chat about your design"}
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-        Feedback
-      </button>
-
-      {chatOpen && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/10 backdrop-blur-[2px] z-40"
-            onClick={onCloseChat}
-            aria-hidden="true"
-          />
-          <div
-            className="fixed bottom-4 right-4 w-[380px] max-h-[500px] rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xl z-50 flex flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] shrink-0">
-              <span className="text-sm font-semibold text-[var(--foreground)]">Design Feedback</span>
-              <button
-                onClick={onCloseChat}
-                className="p-1.5 rounded-lg text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-colors"
-                aria-label="Close"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
+    <div
+      className="fixed left-0 right-0 bottom-0 z-40 flex flex-col bg-[var(--surface)]/95 backdrop-blur-md border-t border-[var(--border)] shadow-[0_-4px_24px_rgba(0,0,0,0.08)] transition-[height] duration-300 ease-out"
+      style={{ height: open ? "min(36vh, 280px)" : "52px" }}
+    >
+      {/* Header bar: click to open when collapsed, or show close when open */}
+      {open ? (
+        <div className="flex items-center justify-between w-full h-[52px] px-4 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--accent-muted)] text-[var(--accent)]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-              {messages.map((msg, i) =>
-                msg.role === "user" ? (
-                  <div key={i} className="flex justify-end">
-                    <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-br-md bg-[var(--accent-muted)] border border-[var(--accent-strong)] text-xs text-[var(--foreground)]">
-                      {msg.content}
-                    </div>
-                  </div>
-                ) : (
-                  <div key={i} className="flex justify-start">
-                    <div className="max-w-[85%] px-3 py-2.5 rounded-2xl rounded-bl-md bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--foreground-secondary)] leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-1 [&_strong]:font-semibold [&_strong]:text-[var(--foreground)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:bg-[var(--surface-hover)] [&_code]:text-[11px]">
-                      <ReactMarkdown
-                        components={{
-                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                          ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 my-2">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1 my-2">{children}</ol>,
-                          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                          strong: ({ children }) => <strong className="font-semibold text-[var(--foreground)]">{children}</strong>,
-                          code: ({ children }) => <code className="px-1 py-0.5 rounded bg-[var(--surface-hover)] text-[11px] font-mono">{children}</code>,
-                        }}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                )
-              )}
-              {loading && (
-                <div className="flex justify-start">
-                  <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-md bg-[var(--surface-elevated)] text-xs text-[var(--foreground-muted)] flex items-center gap-2">
-                    <span className="animate-pulse">Thinking...</span>
+            <span className="text-sm font-medium text-[var(--foreground)]">Design feedback</span>
+            {messages.length > 0 && (
+              <span className="text-[11px] text-[var(--foreground-muted)]">{messages.length} message{messages.length !== 1 ? "s" : ""}</span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-lg text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-colors"
+            aria-label="Close chat"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={onOpen}
+          disabled={disabled}
+          className={`
+            flex items-center justify-between w-full h-[52px] px-4 shrink-0
+            transition-colors duration-200 hover:bg-[var(--surface-hover)]/80
+            ${disabled ? "opacity-60 cursor-not-allowed" : ""}
+          `}
+          aria-label="Open design feedback chat"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--surface-elevated)] text-[var(--foreground-secondary)]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <span className="text-sm font-medium text-[var(--foreground)]">Design feedback</span>
+            {messages.length > 0 && (
+              <span className="text-[11px] text-[var(--foreground-muted)]">{messages.length} message{messages.length !== 1 ? "s" : ""}</span>
+            )}
+          </div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--foreground-muted)]">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+      )}
+
+      {/* Expanded: messages + input */}
+      {open && (
+        <>
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 space-y-3 border-t border-[var(--border)]/80">
+            {messages.length === 0 && !loading && (
+              <p className="text-xs text-[var(--foreground-muted)] py-2">Ask about your design or get feedback. Add blocks to the canvas first.</p>
+            )}
+            {messages.map((msg, i) =>
+              msg.role === "user" ? (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-br-md bg-[var(--accent-muted)] border border-[var(--accent-strong)] text-xs text-[var(--foreground)]">
+                    {msg.content}
                   </div>
                 </div>
-              )}
-            </div>
-            <form onSubmit={handleSubmit} className="p-3 border-t border-[var(--border)] shrink-0">
+              ) : (
+                <div key={i} className="flex justify-start">
+                  <div className="max-w-[85%] px-3 py-2.5 rounded-2xl rounded-bl-md bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--foreground-secondary)] leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-1 [&_strong]:font-semibold [&_strong]:text-[var(--foreground)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:bg-[var(--surface-hover)] [&_code]:text-[11px]">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 my-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1 my-2">{children}</ol>,
+                        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                        strong: ({ children }) => <strong className="font-semibold text-[var(--foreground)]">{children}</strong>,
+                        code: ({ children }) => <code className="px-1 py-0.5 rounded bg-[var(--surface-hover)] text-[11px] font-mono">{children}</code>,
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              )
+            )}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-md bg-[var(--surface-elevated)] text-xs text-[var(--foreground-muted)] flex items-center gap-2">
+                  <span className="animate-pulse">Thinking...</span>
+                </div>
+              </div>
+            )}
+            {suggestionCtx?.pendingSuggestionIds?.length && (
+              <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-xl bg-[var(--accent-muted)]/50 border border-[var(--accent)]/40">
+                <span className="text-xs font-medium text-[var(--foreground)]">Suggested architecture added to canvas</span>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={suggestionCtx.onAcceptSuggestion}
+                    className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    onClick={suggestionCtx.onDeclineSuggestion}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-hover)]"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <form onSubmit={handleSubmit} className="p-3 pt-2 border-t border-[var(--border)] shrink-0 bg-[var(--surface)]">
+            <div className="flex gap-2 items-end">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -902,14 +1111,20 @@ function FeedbackButton({
                 placeholder="Ask about your design..."
                 rows={1}
                 disabled={loading || disabled}
-                className="w-full px-3 py-2 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] text-sm text-[var(--foreground)] placeholder-[var(--foreground-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:border-[var(--accent)] resize-none disabled:opacity-50"
+                className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] text-sm text-[var(--foreground)] placeholder-[var(--foreground-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:border-[var(--accent)] resize-none disabled:opacity-50"
               />
-              <p className="mt-1 text-[10px] text-[var(--foreground-muted)]">Press Enter to send</p>
-            </form>
-          </div>
+              <button
+                type="submit"
+                disabled={!input.trim() || loading || disabled}
+                className="shrink-0 px-4 py-2.5 rounded-xl bg-[var(--accent)] text-[var(--accent-foreground)] text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              >
+                Send
+              </button>
+            </div>
+          </form>
         </>
       )}
-    </>
+    </div>
   );
 }
 
