@@ -20,7 +20,7 @@ gpu_config = LiveServerless(
         "torch>=2.0.0",
         "torchvision>=0.15.0",
         "pydantic==2.10.4",
-        "git+https://github.com/Ryan6407/AIPlayground.git@sreekara-test-classification#subdirectory=backend",
+        "git+https://github.com/Ryan6407/AIPlayground.git@main#subdirectory=backend",
         "requests>=2.28.0",
         "Pillow>=10.0.0",
     ]
@@ -94,6 +94,18 @@ async def train_model_flash(graph_dict: dict, dataset_id: str, config_dict: dict
             "BCEWithLogitsLoss": nn.BCEWithLogitsLoss(),
         }
         loss_fn = loss_fn_map.get(loss_fn_name, nn.CrossEntropyLoss())
+
+        # CrossEntropyLoss includes LogSoftmax internally, so having an explicit
+        # Softmax layer causes LogSoftmax(Softmax(x)) which kills gradients.
+        # Replace any trailing Softmax with Identity for these loss functions.
+        if loss_fn_name in ("CrossEntropyLoss", "BCEWithLogitsLoss"):
+            layers = model.layers
+            layer_keys = list(layers.keys())
+            if layer_keys:
+                last_layer = layers[layer_keys[-1]]
+                if isinstance(last_layer, nn.Softmax):
+                    layers[layer_keys[-1]] = nn.Identity()
+                    print(f"[FLASH] Replaced trailing Softmax with Identity (incompatible with {loss_fn_name})")
 
         # Setup optimizer
         opt_map = {
