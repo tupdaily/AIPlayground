@@ -919,6 +919,316 @@ export const VGG_WALKTHROUGH_STEPS: WalkthroughStep[] = VGG_BLOCK_ORDER.map((blo
   };
 });
 
+// ── Inception / GoogLeNet (Szegedy et al., 2015) ─────────────────────────────
+const INCEPTION_STEP_META = {
+  version: "1.0" as const,
+  metadata: { name: "Inception walkthrough", created_at: new Date().toISOString() },
+};
+
+const INCEPTION_NODES = {
+  input_1: { id: "input_1", type: "input", params: {}, position: { x: 80, y: 200 } },
+  conv_stem: { id: "conv_stem", type: "conv2d", params: { in_channels: 1, out_channels: 64, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 360, y: 200 } },
+  relu_stem: { id: "relu_stem", type: "relu", params: {}, position: { x: 640, y: 200 } },
+  pool_stem: { id: "pool_stem", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 920, y: 200 } },
+  conv_1x1_a: { id: "conv_1x1_a", type: "conv2d", params: { in_channels: 64, out_channels: 64, kernel_size: 1, stride: 1, padding: 0 }, position: { x: 1200, y: 80 } },
+  relu_a: { id: "relu_a", type: "relu", params: {}, position: { x: 1480, y: 80 } },
+  pool_a: { id: "pool_a", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 1760, y: 80 } },
+  conv_1x1_b: { id: "conv_1x1_b", type: "conv2d", params: { in_channels: 64, out_channels: 96, kernel_size: 1, stride: 1, padding: 0 }, position: { x: 1200, y: 200 } },
+  relu_b1: { id: "relu_b1", type: "relu", params: {}, position: { x: 1480, y: 200 } },
+  conv_3x3_b: { id: "conv_3x3_b", type: "conv2d", params: { in_channels: 96, out_channels: 128, kernel_size: 3, stride: 1, padding: 1 }, position: { x: 1760, y: 200 } },
+  relu_b2: { id: "relu_b2", type: "relu", params: {}, position: { x: 2040, y: 200 } },
+  pool_b2: { id: "pool_b2", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 2320, y: 200 } },
+  conv_1x1_c: { id: "conv_1x1_c", type: "conv2d", params: { in_channels: 64, out_channels: 16, kernel_size: 1, stride: 1, padding: 0 }, position: { x: 1200, y: 320 } },
+  relu_c1: { id: "relu_c1", type: "relu", params: {}, position: { x: 1480, y: 320 } },
+  conv_5x5_c: { id: "conv_5x5_c", type: "conv2d", params: { in_channels: 16, out_channels: 32, kernel_size: 5, stride: 1, padding: 2 }, position: { x: 1760, y: 320 } },
+  relu_c2: { id: "relu_c2", type: "relu", params: {}, position: { x: 2040, y: 320 } },
+  pool_c: { id: "pool_c", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 2320, y: 320 } },
+  pool_b: { id: "pool_b", type: "maxpool2d", params: { kernel_size: 2, stride: 2 }, position: { x: 1200, y: 440 } },
+  conv_1x1_d: { id: "conv_1x1_d", type: "conv2d", params: { in_channels: 64, out_channels: 32, kernel_size: 1, stride: 1, padding: 0 }, position: { x: 1480, y: 440 } },
+  relu_d: { id: "relu_d", type: "relu", params: {}, position: { x: 1760, y: 440 } },
+  concat_ab: { id: "concat_ab", type: "concat", params: { dim: 1 }, position: { x: 2800, y: 140 } },
+  concat_cd: { id: "concat_cd", type: "concat", params: { dim: 1 }, position: { x: 2800, y: 380 } },
+  concat_out: { id: "concat_out", type: "concat", params: { dim: 1 }, position: { x: 3080, y: 260 } },
+  flatten_1: { id: "flatten_1", type: "flatten", params: {}, position: { x: 3360, y: 260 } },
+  fc: { id: "fc", type: "linear", params: { in_features: 12544, out_features: 1000 }, position: { x: 3640, y: 260 } },
+  output_1: { id: "output_1", type: "output", params: {}, position: { x: 3920, y: 260 } },
+};
+
+const INCEPTION_EDGES = [
+  { id: "e0", source: "input_1", sourceHandle: "out", target: "conv_stem", targetHandle: "in" },
+  { id: "e1", source: "conv_stem", sourceHandle: "out", target: "relu_stem", targetHandle: "in" },
+  { id: "e2", source: "relu_stem", sourceHandle: "out", target: "pool_stem", targetHandle: "in" },
+  { id: "e3a", source: "pool_stem", sourceHandle: "out", target: "conv_1x1_a", targetHandle: "in" },
+  { id: "e3b", source: "pool_stem", sourceHandle: "out", target: "conv_1x1_b", targetHandle: "in" },
+  { id: "e3c", source: "pool_stem", sourceHandle: "out", target: "conv_1x1_c", targetHandle: "in" },
+  { id: "e3d", source: "pool_stem", sourceHandle: "out", target: "pool_b", targetHandle: "in" },
+  { id: "e4a", source: "conv_1x1_a", sourceHandle: "out", target: "relu_a", targetHandle: "in" },
+  { id: "e4b", source: "conv_1x1_b", sourceHandle: "out", target: "relu_b1", targetHandle: "in" },
+  { id: "e4c", source: "conv_1x1_c", sourceHandle: "out", target: "relu_c1", targetHandle: "in" },
+  { id: "e4d", source: "pool_b", sourceHandle: "out", target: "conv_1x1_d", targetHandle: "in" },
+  { id: "e5a", source: "relu_a", sourceHandle: "out", target: "pool_a", targetHandle: "in" },
+  { id: "e5b", source: "relu_b1", sourceHandle: "out", target: "conv_3x3_b", targetHandle: "in" },
+  { id: "e5b1", source: "conv_3x3_b", sourceHandle: "out", target: "relu_b2", targetHandle: "in" },
+  { id: "e5c", source: "relu_c1", sourceHandle: "out", target: "conv_5x5_c", targetHandle: "in" },
+  { id: "e5c1", source: "conv_5x5_c", sourceHandle: "out", target: "relu_c2", targetHandle: "in" },
+  { id: "e5d", source: "conv_1x1_d", sourceHandle: "out", target: "relu_d", targetHandle: "in" },
+  { id: "e5b2", source: "relu_b2", sourceHandle: "out", target: "pool_b2", targetHandle: "in" },
+  { id: "e5c2", source: "relu_c2", sourceHandle: "out", target: "pool_c", targetHandle: "in" },
+  { id: "e6a", source: "pool_a", sourceHandle: "out", target: "concat_ab", targetHandle: "in_a" },
+  { id: "e6b", source: "pool_b2", sourceHandle: "out", target: "concat_ab", targetHandle: "in_b" },
+  { id: "e6c", source: "pool_c", sourceHandle: "out", target: "concat_cd", targetHandle: "in_a" },
+  { id: "e6d", source: "relu_d", sourceHandle: "out", target: "concat_cd", targetHandle: "in_b" },
+  { id: "e7", source: "concat_ab", sourceHandle: "out", target: "concat_out", targetHandle: "in_a" },
+  { id: "e8", source: "concat_cd", sourceHandle: "out", target: "concat_out", targetHandle: "in_b" },
+  { id: "e9", source: "concat_out", sourceHandle: "out", target: "flatten_1", targetHandle: "in" },
+  { id: "e10", source: "flatten_1", sourceHandle: "out", target: "fc", targetHandle: "in" },
+  { id: "e11", source: "fc", sourceHandle: "out", target: "output_1", targetHandle: "in" },
+];
+
+const INCEPTION_BLOCK_ORDER = [
+  "input_1", "conv_stem", "relu_stem", "pool_stem",
+  "conv_1x1_a", "relu_a", "pool_a",
+  "conv_1x1_b", "relu_b1", "conv_3x3_b", "relu_b2", "pool_b2",
+  "conv_1x1_c", "relu_c1", "conv_5x5_c", "relu_c2", "pool_c",
+  "pool_b", "conv_1x1_d", "relu_d",
+  "concat_ab", "concat_cd", "concat_out",
+  "flatten_1", "fc", "output_1",
+] as const;
+
+function inceptionGraphUpToBlock(index: number) {
+  const nodeIds = new Set(INCEPTION_BLOCK_ORDER.slice(0, index + 1));
+  const nodes = INCEPTION_BLOCK_ORDER.slice(0, index + 1).map((id) => INCEPTION_NODES[id as keyof typeof INCEPTION_NODES]);
+  const edges = INCEPTION_EDGES.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
+  return { nodes, edges };
+}
+
+const INCEPTION_BLOCK_TITLES: Record<typeof INCEPTION_BLOCK_ORDER[number], string> = {
+  input_1: "Input",
+  conv_stem: "Conv2D (64 filters, 3×3, stem)",
+  relu_stem: "ReLU",
+  pool_stem: "MaxPool2D (2×2)",
+  conv_1x1_a: "1×1 Conv (branch 1)",
+  relu_a: "ReLU",
+  pool_a: "MaxPool2D (2×2)",
+  conv_1x1_b: "1×1 Conv (branch 2)",
+  relu_b1: "ReLU",
+  conv_3x3_b: "3×3 Conv",
+  relu_b2: "ReLU",
+  pool_b2: "MaxPool2D (2×2)",
+  conv_1x1_c: "1×1 Conv (branch 3)",
+  relu_c1: "ReLU",
+  conv_5x5_c: "5×5 Conv",
+  relu_c2: "ReLU",
+  pool_c: "MaxPool2D (2×2)",
+  pool_b: "MaxPool2D (branch 4)",
+  conv_1x1_d: "1×1 Conv",
+  relu_d: "ReLU",
+  concat_ab: "Concat (branches 1 & 2)",
+  concat_cd: "Concat (branches 3 & 4)",
+  concat_out: "Concat (all branches)",
+  flatten_1: "Flatten",
+  fc: "Linear (1000)",
+  output_1: "Output",
+};
+
+const INCEPTION_BLOCK_DESCRIPTIONS: Record<typeof INCEPTION_BLOCK_ORDER[number], string> = {
+  input_1: "Raw image input. Inception was designed for ImageNet (224×224); we use smaller input here.",
+  conv_stem: "Stem conv: 64 filters, 3×3, padding 1. Extracts initial features before the Inception module.",
+  relu_stem: "ReLU after the stem conv.",
+  pool_stem: "2×2 MaxPool halves spatial size. Output feeds all four parallel branches.",
+  conv_1x1_a: "Branch 1: 1×1 conv (64 filters). Captures point-wise features. No expensive 3×3 or 5×5 here.",
+  relu_a: "ReLU after branch 1's 1×1 conv.",
+  pool_a: "2×2 MaxPool in branch 1. All branches end at 7×7 spatial size for concatenation.",
+  conv_1x1_b: "Branch 2: 1×1 conv (96 filters) as bottleneck before the 3×3. Reduces channels and compute.",
+  relu_b1: "ReLU before the 3×3 in branch 2.",
+  conv_3x3_b: "3×3 conv (128 filters). Medium receptive field. The 1×1 before it cuts down channels.",
+  relu_b2: "ReLU after 3×3.",
+  pool_b2: "2×2 MaxPool to match spatial size with other branches.",
+  conv_1x1_c: "Branch 3: 1×1 conv (16 filters) before the 5×5. Strong bottleneck.",
+  relu_c1: "ReLU before 5×5.",
+  conv_5x5_c: "5×5 conv (32 filters). Larger receptive field. More expensive; 1×1 before keeps it manageable.",
+  relu_c2: "ReLU after 5×5.",
+  pool_c: "2×2 MaxPool.",
+  pool_b: "Branch 4: 2×2 MaxPool first, then 1×1. Captures max-pooled features and projects them.",
+  conv_1x1_d: "1×1 conv (32 filters) after pool. Projects the pooled features.",
+  relu_d: "ReLU.",
+  concat_ab: "Concatenate branches 1 and 2 along the channel dimension. 64 + 128 = 192 channels.",
+  concat_cd: "Concatenate branches 3 and 4. 32 + 32 = 64 channels.",
+  concat_out: "Concatenate all four branches. 64 + 128 + 32 + 32 = 256 channels. Multi-scale features fused.",
+  flatten_1: "Flatten spatial and channel dimensions for the classifier.",
+  fc: "Linear to 1000 classes (ImageNet).",
+  output_1: "Output logits.",
+};
+
+const INCEPTION_QUIZ_DISTRACTORS = ["BatchNorm", "Dropout", "Another Concat", "Softmax"];
+
+function inceptionChoicesForStep(stepIndex: number): string[] {
+  if (stepIndex >= INCEPTION_BLOCK_ORDER.length - 1) return [];
+  const correct = INCEPTION_BLOCK_TITLES[INCEPTION_BLOCK_ORDER[stepIndex + 1]];
+  const wrong = INCEPTION_BLOCK_ORDER.filter((_, i) => i !== stepIndex + 1).map((id) => INCEPTION_BLOCK_TITLES[id]);
+  const pool = [...INCEPTION_QUIZ_DISTRACTORS, ...wrong].filter((t) => t !== correct);
+  return [correct, ...pool.slice(0, 3)];
+}
+
+export const INCEPTION_WALKTHROUGH_STEPS: WalkthroughStep[] = INCEPTION_BLOCK_ORDER.map((blockId, index) => {
+  const { nodes, edges } = inceptionGraphUpToBlock(index);
+  const isLast = index === INCEPTION_BLOCK_ORDER.length - 1;
+  return {
+    title: INCEPTION_BLOCK_TITLES[blockId],
+    description: INCEPTION_BLOCK_DESCRIPTIONS[blockId],
+    ...(!isLast && {
+      nextQuestion: "What layer should come next?",
+      correctNext: INCEPTION_BLOCK_TITLES[INCEPTION_BLOCK_ORDER[index + 1]],
+      nextChoices: inceptionChoicesForStep(index),
+    }),
+    graph: { ...INCEPTION_STEP_META, nodes, edges },
+  };
+});
+
+// ── T5 (Raffel et al., 2020) ───────────────────────────────────────────────
+const T5_STEP_META = {
+  version: "1.0" as const,
+  metadata: { name: "T5 walkthrough", created_at: new Date().toISOString() },
+};
+
+const T5_NODES = {
+  text_input_1: { id: "text_input_1", type: "text_input", params: { batch_size: 1, seq_len: 128 }, position: { x: 80, y: 400 } },
+  text_embed_1: { id: "text_embed_1", type: "text_embedding", params: { vocab_size: 32128, embedding_dim: 128 }, position: { x: 360, y: 400 } },
+  pos_embed_1: { id: "pos_embed_1", type: "positional_embedding", params: { d_model: 128, max_len: 512 }, position: { x: 640, y: 400 } },
+  enc_ln1: { id: "enc_ln1", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 640, y: 300 } },
+  enc_attn: { id: "enc_attn", type: "attention", params: { embed_dim: 128, num_heads: 4 }, position: { x: 920, y: 300 } },
+  enc_add1: { id: "enc_add1", type: "add", params: {}, position: { x: 1200, y: 300 } },
+  enc_ln2: { id: "enc_ln2", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 640, y: 200 } },
+  enc_linear1: { id: "enc_linear1", type: "linear", params: { in_features: 128, out_features: 512 }, position: { x: 920, y: 200 } },
+  enc_gelu: { id: "enc_gelu", type: "activation", params: { activation: "gelu" }, position: { x: 1200, y: 200 } },
+  enc_linear2: { id: "enc_linear2", type: "linear", params: { in_features: 512, out_features: 128 }, position: { x: 1480, y: 200 } },
+  enc_add2: { id: "enc_add2", type: "add", params: {}, position: { x: 1760, y: 200 } },
+  dec_ln1: { id: "dec_ln1", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 1760, y: 100 } },
+  dec_attn: { id: "dec_attn", type: "attention", params: { embed_dim: 128, num_heads: 4 }, position: { x: 2040, y: 100 } },
+  dec_add1: { id: "dec_add1", type: "add", params: {}, position: { x: 2320, y: 100 } },
+  dec_ln2: { id: "dec_ln2", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 2040, y: 50 } },
+  dec_linear1: { id: "dec_linear1", type: "linear", params: { in_features: 128, out_features: 512 }, position: { x: 2320, y: 50 } },
+  dec_gelu: { id: "dec_gelu", type: "activation", params: { activation: "gelu" }, position: { x: 2600, y: 50 } },
+  dec_linear2: { id: "dec_linear2", type: "linear", params: { in_features: 512, out_features: 128 }, position: { x: 2880, y: 50 } },
+  dec_add2: { id: "dec_add2", type: "add", params: {}, position: { x: 3160, y: 50 } },
+  dec_ln3: { id: "dec_ln3", type: "layernorm", params: { normalized_shape: 128 }, position: { x: 2880, y: 0 } },
+  output_1: { id: "output_1", type: "output", params: {}, position: { x: 3160, y: 0 } },
+};
+
+const T5_EDGES = [
+  { id: "e0a", source: "text_input_1", sourceHandle: "out", target: "text_embed_1", targetHandle: "in" },
+  { id: "e0b", source: "text_embed_1", sourceHandle: "out", target: "pos_embed_1", targetHandle: "in" },
+  { id: "e1", source: "pos_embed_1", sourceHandle: "out", target: "enc_ln1", targetHandle: "in" },
+  { id: "e2", source: "pos_embed_1", sourceHandle: "out", target: "enc_add1", targetHandle: "in_a" },
+  { id: "e3", source: "enc_ln1", sourceHandle: "out", target: "enc_attn", targetHandle: "in" },
+  { id: "e4", source: "enc_attn", sourceHandle: "out", target: "enc_add1", targetHandle: "in_b" },
+  { id: "e5", source: "enc_add1", sourceHandle: "out", target: "enc_ln2", targetHandle: "in" },
+  { id: "e6", source: "enc_ln2", sourceHandle: "out", target: "enc_linear1", targetHandle: "in" },
+  { id: "e7", source: "enc_ln2", sourceHandle: "out", target: "enc_add2", targetHandle: "in_a" },
+  { id: "e8", source: "enc_linear1", sourceHandle: "out", target: "enc_gelu", targetHandle: "in" },
+  { id: "e9", source: "enc_gelu", sourceHandle: "out", target: "enc_linear2", targetHandle: "in" },
+  { id: "e10", source: "enc_linear2", sourceHandle: "out", target: "enc_add2", targetHandle: "in_b" },
+  { id: "e11", source: "enc_add2", sourceHandle: "out", target: "dec_ln1", targetHandle: "in" },
+  { id: "e12", source: "enc_add2", sourceHandle: "out", target: "dec_add1", targetHandle: "in_a" },
+  { id: "e13", source: "dec_ln1", sourceHandle: "out", target: "dec_attn", targetHandle: "in" },
+  { id: "e14", source: "dec_attn", sourceHandle: "out", target: "dec_add1", targetHandle: "in_b" },
+  { id: "e15", source: "dec_add1", sourceHandle: "out", target: "dec_ln2", targetHandle: "in" },
+  { id: "e16", source: "dec_ln2", sourceHandle: "out", target: "dec_linear1", targetHandle: "in" },
+  { id: "e17", source: "dec_ln2", sourceHandle: "out", target: "dec_add2", targetHandle: "in_a" },
+  { id: "e18", source: "dec_linear1", sourceHandle: "out", target: "dec_gelu", targetHandle: "in" },
+  { id: "e19", source: "dec_gelu", sourceHandle: "out", target: "dec_linear2", targetHandle: "in" },
+  { id: "e20", source: "dec_linear2", sourceHandle: "out", target: "dec_add2", targetHandle: "in_b" },
+  { id: "e21", source: "dec_add2", sourceHandle: "out", target: "dec_ln3", targetHandle: "in" },
+  { id: "e22", source: "dec_ln3", sourceHandle: "out", target: "output_1", targetHandle: "in" },
+];
+
+const T5_BLOCK_ORDER = [
+  "text_input_1", "text_embed_1", "pos_embed_1",
+  "enc_ln1", "enc_attn", "enc_add1", "enc_ln2", "enc_linear1", "enc_gelu", "enc_linear2", "enc_add2",
+  "dec_ln1", "dec_attn", "dec_add1", "dec_ln2", "dec_linear1", "dec_gelu", "dec_linear2", "dec_add2",
+  "dec_ln3", "output_1",
+] as const;
+
+function t5GraphUpToBlock(index: number) {
+  const nodeIds = new Set(T5_BLOCK_ORDER.slice(0, index + 1));
+  const nodes = T5_BLOCK_ORDER.slice(0, index + 1).map((id) => T5_NODES[id as keyof typeof T5_NODES]);
+  const edges = T5_EDGES.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
+  return { nodes, edges };
+}
+
+const T5_BLOCK_TITLES: Record<typeof T5_BLOCK_ORDER[number], string> = {
+  text_input_1: "Text Input",
+  text_embed_1: "Token Embedding",
+  pos_embed_1: "Position Embedding",
+  enc_ln1: "LayerNorm (encoder)",
+  enc_attn: "Encoder Self-Attention",
+  enc_add1: "Add & Norm",
+  enc_ln2: "LayerNorm (pre-FFN)",
+  enc_linear1: "Linear (expand)",
+  enc_gelu: "GELU",
+  enc_linear2: "Linear (project)",
+  enc_add2: "Add & Norm",
+  dec_ln1: "LayerNorm (decoder)",
+  dec_attn: "Decoder Self-Attention",
+  dec_add1: "Add & Norm",
+  dec_ln2: "LayerNorm (pre-FFN)",
+  dec_linear1: "Linear (expand)",
+  dec_gelu: "GELU",
+  dec_linear2: "Linear (project)",
+  dec_add2: "Add & Norm",
+  dec_ln3: "LayerNorm (final)",
+  output_1: "Output",
+};
+
+const T5_BLOCK_DESCRIPTIONS: Record<typeof T5_BLOCK_ORDER[number], string> = {
+  text_input_1: "Token IDs. T5 frames all tasks as text-to-text: input and output are both text.",
+  text_embed_1: "Maps tokens to vectors. T5 uses a shared vocabulary (32128) for encoder and decoder.",
+  pos_embed_1: "Learned positional embeddings. T5 uses relative position in the full model; we show learned absolute here.",
+  enc_ln1: "LayerNorm before encoder self-attention. Stabilizes the encoder block.",
+  enc_attn: "Bidirectional self-attention. The encoder sees the full input sequence—no causal masking.",
+  enc_add1: "Residual connection after attention. Add & Norm preserves gradient flow.",
+  enc_ln2: "LayerNorm before the encoder FFN.",
+  enc_linear1: "Position-wise FFN: expand 128 → 512. T5 uses GELU (not ReLU) in the FFN.",
+  enc_gelu: "GELU activation. Smoother than ReLU; standard in T5, BERT, GPT.",
+  enc_linear2: "Project back 512 → 128. FFN completes: Linear → GELU → Linear.",
+  enc_add2: "Residual after FFN. Encoder block output feeds the decoder.",
+  dec_ln1: "LayerNorm before decoder self-attention. The decoder processes encoder output (and its own context in the full model).",
+  dec_attn: "Decoder self-attention. In the full T5, this is causal (masked) for autoregressive generation; decoder also has cross-attention to encoder.",
+  dec_add1: "Residual after decoder attention.",
+  dec_ln2: "LayerNorm before the decoder FFN.",
+  dec_linear1: "Position-wise FFN: expand 128 → 512.",
+  dec_gelu: "GELU in the decoder FFN.",
+  dec_linear2: "Project 512 → 128.",
+  dec_add2: "Residual after decoder FFN.",
+  dec_ln3: "Final LayerNorm before output projection.",
+  output_1: "Decoder output. In the full model, this is projected to vocab for next-token logits.",
+};
+
+const T5_QUIZ_DISTRACTORS = ["Dropout", "BatchNorm", "Another Attention layer", "Softmax"];
+
+function t5ChoicesForStep(stepIndex: number): string[] {
+  if (stepIndex >= T5_BLOCK_ORDER.length - 1) return [];
+  const correct = T5_BLOCK_TITLES[T5_BLOCK_ORDER[stepIndex + 1]];
+  const wrong = T5_BLOCK_ORDER.filter((_, i) => i !== stepIndex + 1).map((id) => T5_BLOCK_TITLES[id]);
+  const pool = [...T5_QUIZ_DISTRACTORS, ...wrong].filter((t) => t !== correct);
+  return [correct, ...pool.slice(0, 3)];
+}
+
+export const T5_WALKTHROUGH_STEPS: WalkthroughStep[] = T5_BLOCK_ORDER.map((blockId, index) => {
+  const { nodes, edges } = t5GraphUpToBlock(index);
+  const isLast = index === T5_BLOCK_ORDER.length - 1;
+  return {
+    title: T5_BLOCK_TITLES[blockId],
+    description: T5_BLOCK_DESCRIPTIONS[blockId],
+    ...(!isLast && {
+      nextQuestion: "What layer should come next?",
+      correctNext: T5_BLOCK_TITLES[T5_BLOCK_ORDER[index + 1]],
+      nextChoices: t5ChoicesForStep(index),
+    }),
+    graph: { ...T5_STEP_META, nodes, edges },
+  };
+});
+
 /** Walkthrough config by level number (papers only). */
 export const PAPER_WALKTHROUGHS: Record<number, WalkthroughStep[]> = {
   7: TRANSFORMER_WALKTHROUGH_STEPS,
@@ -928,5 +1238,7 @@ export const PAPER_WALKTHROUGHS: Record<number, WalkthroughStep[]> = {
   11: GPT_WALKTHROUGH_STEPS,
   12: LENET5_WALKTHROUGH_STEPS,
   13: VGG_WALKTHROUGH_STEPS,
+  17: INCEPTION_WALKTHROUGH_STEPS,
+  18: T5_WALKTHROUGH_STEPS,
 };
 

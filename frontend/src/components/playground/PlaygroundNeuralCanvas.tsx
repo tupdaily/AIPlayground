@@ -311,6 +311,11 @@ export default function PlaygroundNeuralCanvas({
   // New playgrounds (no id, no level) start empty; otherwise use loaded/level graph or empty while loading
   const initialNodes = stepGraphNodesEdges?.nodes ?? initialGraph?.nodes ?? [];
   const initialEdges = stepGraphNodesEdges?.edges ?? initialGraph?.edges ?? [];
+  // Focused node for zoom: the layer we're currently describing in this step
+  const paperFocusedNodeId =
+    inWalkthrough && currentStep?.graph?.nodes?.length
+      ? currentStep.graph.nodes[Math.min(walkthroughStepIndex, currentStep.graph.nodes.length - 1)]?.id ?? null
+      : null;
 
   const canvasKey = inWalkthrough
     ? `${playgroundId ?? levelParam ?? "default"}-walkthrough-step-${walkthroughStepIndex}`
@@ -380,6 +385,7 @@ export default function PlaygroundNeuralCanvas({
             isPaperLevel={isPaperLevel}
             paperLevelNumber={inWalkthrough ? challengeLevelNumber : null}
             paperStepIndex={inWalkthrough ? walkthroughStepIndex : null}
+            paperFocusedNodeId={paperFocusedNodeId}
           />
           </div>
         </div>

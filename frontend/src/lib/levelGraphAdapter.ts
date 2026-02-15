@@ -256,6 +256,7 @@ export function levelGraphToNeuralCanvas(
     });
 
   const inPortCount = new Map<string, number>();
+  const usedEdgeIds = new Set<string>();
   const edges: Edge[] = edgesForHandleFix.map(({ e, targetType }) => {
     let targetHandle = (e?.targetHandle as string) ?? "in";
     if (MULTI_INPUT_TYPES.has(targetType)) {
@@ -265,8 +266,16 @@ export function levelGraphToNeuralCanvas(
         targetHandle = count === 0 ? "in_a" : "in_b";
       }
     }
+    const baseId = (e?.id as string) ?? `e-${e?.source}-${e?.target}`;
+    let id = baseId;
+    if (usedEdgeIds.has(id)) {
+      let n = 1;
+      while (usedEdgeIds.has(`${id}-${n}`)) n++;
+      id = `${id}-${n}`;
+    }
+    usedEdgeIds.add(id);
     return {
-      id: (e?.id as string) ?? `e-${e?.source}-${e?.target}`,
+      id,
       source: String(e?.source ?? ""),
       target: String(e?.target ?? ""),
       sourceHandle: (e?.sourceHandle as string) ?? "out",
