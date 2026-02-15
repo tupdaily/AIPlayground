@@ -1,19 +1,8 @@
 "use client";
 
 // ---------------------------------------------------------------------------
-// BaseBlock — the stunning reusable wrapper every block node renders through
-// ---------------------------------------------------------------------------
-//
-// Visual design:
-//   ┌─────────────────────────────────────┐
-//   │ ● Icon  Block Name       type  👁   │ ← gradient header bar
-//   ├─────────────────────────────────────┤
-//   │  param₁: [__256__]  ▲▼             │ ← inline-editable params
-//   │  param₂: [__128__]  ▲▼             │
-//   ├─────────────────────────────────────┤
-//   │  → [B, 256]  →  [B, 128]          │ ← shape bar (or error)
-//   └─────────────────────────────────────┘
-//   ◉ input handle (left)     output handle (right) ◉
+// BaseBlock — v3 Light Theme: white card, auto-height, colored accent bar,
+// unique visual content per block type, params shown as friendly pills
 // ---------------------------------------------------------------------------
 
 import {
@@ -30,8 +19,8 @@ import {
   type BlockDefinition,
   type ParamSchema,
 } from "@/neuralcanvas/lib/blockRegistry";
-import { CANVAS_UI_SCALE, BLOCK_FIXED_SIZE } from "@/neuralcanvas/lib/canvasConstants";
-import { getShapeLabel } from "@/neuralcanvas/lib/shapeEngine";
+import { CANVAS_UI_SCALE, BLOCK_BASE_WIDTH } from "@/neuralcanvas/lib/canvasConstants";
+import { getShapeLabel, getShapeLabelTooltip } from "@/neuralcanvas/lib/shapeEngine";
 import { useShapes } from "@/neuralcanvas/components/canvas/ShapeContext";
 import { usePeepInsideContext } from "@/neuralcanvas/components/peep-inside/PeepInsideContext";
 import { useGradientFlow, healthToColor } from "@/neuralcanvas/components/peep-inside/GradientFlowContext";
@@ -64,9 +53,6 @@ import {
 // Icon map
 // ---------------------------------------------------------------------------
 
-/** Uniform scale for block size on the playground (matches canvas shape displays). */
-const BLOCK_SCALE = CANVAS_UI_SCALE;
-
 export const ICON_MAP: Record<string, LucideIcon> = {
   inbox: Inbox,
   target: Target,
@@ -88,7 +74,38 @@ export const ICON_MAP: Record<string, LucideIcon> = {
 };
 
 // ---------------------------------------------------------------------------
-// Inline number input with up/down steppers
+// Human-friendly parameter names
+// ---------------------------------------------------------------------------
+
+const FRIENDLY_PARAM_NAMES: Record<string, string> = {
+  in_features: "Input size",
+  out_features: "Output size",
+  in_channels: "Input channels",
+  out_channels: "Output channels",
+  kernel_size: "Filter size",
+  stride: "Step size",
+  padding: "Padding",
+  embed_dim: "Embedding size",
+  num_heads: "Attention heads",
+  activation: "Function",
+  p: "Drop rate",
+  hidden_size: "Hidden size",
+  num_layers: "Layers",
+  num_embeddings: "Vocabulary size",
+  embedding_dim: "Vector size",
+  max_len: "Max length",
+  dim: "Dimension",
+  normalized_shape: "Norm size",
+  num_features: "Features",
+  vocab_size: "Vocabulary",
+  input_size: "Input size",
+  d_model: "Model dim",
+  batch_size: "Batch size",
+  seq_len: "Sequence length",
+};
+
+// ---------------------------------------------------------------------------
+// Number input with steppers
 // ---------------------------------------------------------------------------
 
 interface NumberParamProps {
@@ -130,31 +147,30 @@ function NumberParam({ value, min, max, step = 1, color, onChange }: NumberParam
         step={step}
         className="
           nodrag nopan
-          min-h-0 px-0.5 py-px rounded leading-none font-mono text-center
-          bg-white/[0.06] border border-white/[0.08]
-          text-neutral-200
-          outline-none focus:border-opacity-60
+          w-[52px] px-1.5 py-0.5 rounded-md text-[12px] font-mono text-center
+          bg-[var(--surface-elevated)] border border-[var(--border)]
+          text-[var(--foreground)]
+          outline-none focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100
           transition-colors duration-100
           [appearance:textfield]
           [&::-webkit-outer-spin-button]:appearance-none
           [&::-webkit-inner-spin-button]:appearance-none
         "
-        style={{ width: 36 * BLOCK_SCALE, fontSize: `${8 * BLOCK_SCALE}px`, borderColor: `${color}30` }}
       />
       <div className="flex flex-col -space-y-px">
         <button
-          className="nodrag nopan p-0 text-neutral-500 hover:text-neutral-300 transition-colors"
+          className="nodrag nopan p-0 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
           onClick={() => onChange(clamp(value + step))}
           tabIndex={-1}
         >
-          <ChevronUp size={Math.round(7 * BLOCK_SCALE) || 5} />
+          <ChevronUp size={10} />
         </button>
         <button
-          className="nodrag nopan p-0 text-neutral-500 hover:text-neutral-300 transition-colors"
+          className="nodrag nopan p-0 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
           onClick={() => onChange(clamp(value - step))}
           tabIndex={-1}
         >
-          <ChevronDown size={Math.round(7 * BLOCK_SCALE) || 5} />
+          <ChevronDown size={10} />
         </button>
       </div>
     </div>
@@ -162,7 +178,7 @@ function NumberParam({ value, min, max, step = 1, color, onChange }: NumberParam
 }
 
 // ---------------------------------------------------------------------------
-// Inline select input
+// Select input
 // ---------------------------------------------------------------------------
 
 interface SelectParamProps {
@@ -172,32 +188,29 @@ interface SelectParamProps {
   onChange: (v: string) => void;
 }
 
-function SelectParam({ value, options, color, onChange }: SelectParamProps) {
+function SelectParam({ value, options, onChange }: SelectParamProps) {
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="
         nodrag nopan
-        min-h-0 px-0.5 py-px rounded leading-none font-mono
-        bg-white/[0.06] border border-white/[0.08]
-        text-neutral-200
-        outline-none focus:border-opacity-60
+        w-[72px] px-1.5 py-0.5 rounded-md text-[12px] font-mono
+        bg-[var(--surface-elevated)] border border-[var(--border)]
+        text-[var(--foreground)]
+        outline-none focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100
         transition-colors duration-100 cursor-pointer
       "
-      style={{ width: 52 * BLOCK_SCALE, fontSize: `${8 * BLOCK_SCALE}px`, borderColor: `${color}30` }}
     >
       {options.map((opt) => (
-        <option key={opt} value={opt} className="bg-neural-surface text-neutral-200">
-          {opt}
-        </option>
+        <option key={opt} value={opt}>{opt}</option>
       ))}
     </select>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Param row renderer
+// Param row
 // ---------------------------------------------------------------------------
 
 interface ParamRowProps {
@@ -208,6 +221,8 @@ interface ParamRowProps {
 }
 
 function ParamRow({ schema, value, color, onUpdate }: ParamRowProps) {
+  const friendlyName = FRIENDLY_PARAM_NAMES[schema.name] ?? schema.name;
+
   const renderInput = () => {
     if (schema.type === "select" && schema.options) {
       return (
@@ -234,9 +249,9 @@ function ParamRow({ schema, value, color, onUpdate }: ParamRowProps) {
   };
 
   return (
-    <div className="flex items-center justify-between gap-0.5">
-      <span className="text-neutral-500 font-mono shrink-0 truncate leading-none" style={{ fontSize: `${7 * BLOCK_SCALE}px`, maxWidth: 28 * BLOCK_SCALE }} title={schema.name}>
-        {schema.name}
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] text-[var(--foreground-muted)] font-medium truncate" title={`${friendlyName} (${schema.name})`}>
+        {friendlyName}
       </span>
       {renderInput()}
     </div>
@@ -248,20 +263,16 @@ function ParamRow({ schema, value, color, onUpdate }: ParamRowProps) {
 // ---------------------------------------------------------------------------
 
 export interface BaseBlockProps {
-  /** React Flow node id. */
   id: string;
-  /** Block type string. */
   blockType: BlockType;
-  /** Current params from node data. */
   params: Record<string, number | string>;
-  /** Whether the node is selected. */
   selected: boolean;
-  /** Optional extra content to render in the body (after params). */
+  /** Unique visual content (SVG illustration) injected by each block type */
   children?: ReactNode;
 }
 
 // ---------------------------------------------------------------------------
-// BaseBlock component
+// BaseBlock component — v3 white card design
 // ---------------------------------------------------------------------------
 
 function BaseBlockComponent({
@@ -276,6 +287,7 @@ function BaseBlockComponent({
   const result = shapes.get(id);
   const { setNodes } = useReactFlow();
   const [errorTooltip, setErrorTooltip] = useState(false);
+  const [showShape, setShowShape] = useState(false);
   const { open: openPeep } = usePeepInsideContext();
   const { enabled: gradFlowEnabled, gradients: gradMap } = useGradientFlow();
   const gradInfo = gradFlowEnabled ? gradMap.get(id) : undefined;
@@ -299,13 +311,12 @@ function BaseBlockComponent({
     [id, blockType, params, openPeep],
   );
 
-  const color = def?.color ?? "#6366f1";
+  const color = def?.color ?? "#6366F1";
   const Icon = def ? ICON_MAP[def.icon] : null;
   const hasError = !!result?.error;
   const inLabel = getShapeLabel(result?.inputShape ?? null);
   const outLabel = getShapeLabel(result?.outputShape ?? null);
 
-  // ── Param update handler ──
   const onParamUpdate = useCallback(
     (name: string, value: number | string) => {
       setNodes((nds) =>
@@ -327,87 +338,83 @@ function BaseBlockComponent({
 
   if (!def) {
     return (
-      <div className="px-2 py-1 rounded bg-red-950 border border-red-500 text-red-300 text-[9px]">
+      <div className="px-4 py-3 rounded-xl bg-[var(--danger-muted)] border border-[var(--danger)] text-[var(--danger)] text-sm">
         Unknown block: {blockType}
       </div>
     );
   }
 
-  const fixedPx = BLOCK_FIXED_SIZE * BLOCK_SCALE;
   return (
     <div
       className={`
         group/block relative flex flex-col
-        rounded overflow-hidden
-        transition-all duration-200
-        ${selected ? "ring-2 scale-[1.02]" : ""}
-        ${hasError ? "ring-red-500/50" : "ring-white/20"}
+        bg-[var(--block-surface)] rounded-2xl
+        border transition-all duration-200
+        ${selected ? "ring-2 shadow-lg scale-[1.01]" : "shadow-[var(--shadow-card)]"}
+        ${hasError ? "border-[var(--danger)] ring-[var(--danger-strong)]" : selected ? "border-[var(--accent)] ring-[var(--accent-strong)]" : "border-[var(--border)] hover:shadow-[var(--shadow-card-hover)]"}
       `}
       style={{
-        width: fixedPx,
-        minWidth: fixedPx,
-        maxWidth: fixedPx,
-        height: fixedPx,
-        minHeight: fixedPx,
-        maxHeight: fixedPx,
-        boxShadow: gradFlowEnabled && gradGlowColor
-          ? `0 0 ${Math.min(gradInfo!.norm * 40, 20)}px ${gradGlowColor}50, 0 2px 12px rgba(0,0,0,0.35)`
-          : selected
-            ? `0 0 12px ${color}30, 0 2px 12px rgba(0,0,0,0.4)`
-            : `0 2px 8px rgba(0,0,0,0.35), 0 0 6px ${color}10`,
+        width: def.width ?? BLOCK_BASE_WIDTH,
         ...(gradFlowEnabled && gradGlowColor
-          ? { outline: `2px solid ${gradGlowColor}50`, outlineOffset: -1 }
+          ? {
+              boxShadow: `0 0 ${Math.min(gradInfo!.norm * 40, 20)}px ${gradGlowColor}40, var(--shadow-card)`,
+              outline: `2px solid ${gradGlowColor}40`,
+              outlineOffset: -1,
+            }
           : {}),
       }}
     >
-      {/* ── Gradient background ── */}
+      {/* ── Colored left accent bar ── */}
       <div
-        className="absolute inset-0 rounded opacity-[0.07] pointer-events-none"
-        style={{
-          background: `linear-gradient(135deg, ${color}, transparent 60%)`,
-        }}
+        className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
+        style={{ backgroundColor: color }}
       />
-      <div className="relative flex flex-col flex-1 min-h-0 bg-neural-surface/95 backdrop-blur-sm rounded border border-neural-border">
-        {/* ══════════ Header bar ══════════ */}
-        <div
-          className="flex items-center gap-0.5 px-1 py-px min-h-0 leading-none shrink-0"
-          style={{
-            background: `linear-gradient(135deg, ${color}20 0%, ${color}08 100%)`,
-          }}
-        >
-          {Icon && (
-            <div
-              className="flex items-center justify-center rounded shrink-0"
-              style={{ backgroundColor: `${color}25`, width: 12 * BLOCK_SCALE, height: 12 * BLOCK_SCALE }}
-            >
-              <Icon size={Math.round(6 * BLOCK_SCALE) || 4} style={{ color }} />
-            </div>
-          )}
-          <span
-            className="font-bold tracking-wide truncate flex-1 min-w-0 leading-none"
-            style={{ color, fontSize: `${8 * BLOCK_SCALE}px` }}
+
+      {/* ═══ Header ═══ */}
+      <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+        {Icon && (
+          <div
+            className="flex items-center justify-center w-7 h-7 rounded-lg shrink-0"
+            style={{ backgroundColor: `${color}12` }}
           >
+            <Icon size={14} style={{ color }} />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <span className="text-[13px] font-bold text-[var(--foreground)] truncate block leading-tight">
             {def.label}
           </span>
-          <button
-            className="
-              nodrag nopan
-              flex items-center justify-center rounded shrink-0
-              text-neutral-600 hover:text-neutral-300
-              bg-white/[0.03] hover:bg-white/[0.08]
-              transition-all duration-150
-              opacity-0 group-hover/block:opacity-100
-            "
-            style={{ width: 12 * BLOCK_SCALE, height: 12 * BLOCK_SCALE }}
-            title="Peep inside this block"
-            onClick={handlePeepInside}
-          >
-            <Eye size={Math.round(6 * BLOCK_SCALE) || 4} />
-          </button>
+          <span className="text-[10px] font-medium uppercase tracking-wider block leading-tight" style={{ color }}>
+            {def.category}
+          </span>
         </div>
+        {/* Peep inside button — visible on hover */}
+        <button
+          className="
+            nodrag nopan
+            flex items-center justify-center w-6 h-6 rounded-lg shrink-0
+            text-[var(--foreground-muted)] hover:text-[var(--accent)]
+            bg-transparent hover:bg-[var(--accent-muted)]
+            transition-all duration-150
+            opacity-0 group-hover/block:opacity-100
+          "
+          title="Peep inside this block"
+          onClick={handlePeepInside}
+        >
+          <Eye size={13} />
+        </button>
+      </div>
 
-        {/* ══════════ Body — editable params (clips so all blocks stay same size) ══════════ */}
-        <div className="px-1 py-px space-y-px leading-none overflow-hidden flex-1 min-h-0">
+      {/* ═══ Visual content area (unique per block type) ═══ */}
+      {children && (
+        <div className="px-4 pb-2">
+          {children}
+        </div>
+      )}
+
+      {/* ═══ Parameters ═══ */}
+      {def.paramSchema.length > 0 && (
+        <div className="px-4 py-2 space-y-1.5 border-t border-[var(--border)]">
           {def.paramSchema.map((schema) => (
             <ParamRow
               key={schema.name}
@@ -417,93 +424,94 @@ function BaseBlockComponent({
               onUpdate={onParamUpdate}
             />
           ))}
-
-          {/* Extra custom content from specific blocks (Input/Output etc.) */}
-          {children}
         </div>
+      )}
 
-        {/* ══════════ Shape bar ══════════ */}
-        <div
-          className={`
-            flex items-center gap-0.5 px-1 py-px min-h-0 leading-none shrink-0
-            border-t font-mono
-            ${hasError ? "border-red-500/30 bg-red-500/[0.05]" : "border-neural-border bg-white/[0.02]"}
-          `}
-          style={{ fontSize: `${6 * BLOCK_SCALE}px` }}
-        >
-          {hasError ? (
-            <>
-              <div className="relative">
-                <button
-                  className="nodrag nopan text-red-400 hover:text-red-300 transition-colors"
-                  onClick={() => setErrorTooltip((v) => !v)}
-                >
-                  <AlertCircle size={Math.round(9 * BLOCK_SCALE) || 6} />
-                </button>
-                {/* Error tooltip */}
-                {errorTooltip && (
-                  <div className="absolute bottom-full left-0 mb-2 z-50 w-56 p-2 rounded-lg bg-red-950/95 border border-red-500/40 text-[10px] text-red-200 leading-relaxed shadow-xl backdrop-blur-md">
-                    {result?.error}
-                  </div>
-                )}
-              </div>
-              <span className="text-red-400 truncate flex-1">{result?.error}</span>
-            </>
-          ) : (
-            <>
-              <span className="text-neutral-500">{inLabel}</span>
-              <span className="text-neutral-600">→</span>
-              <span style={{ color: `${color}cc` }}>{outLabel}</span>
-            </>
-          )}
-        </div>
-
-        {/* ══════════ Handles with glow ══════════ */}
-        {def.inputPorts.map((port, i) => {
-          const topPct = def.inputPorts.length === 1
-            ? 50
-            : 30 + (i / Math.max(def.inputPorts.length - 1, 1)) * 40;
-          return (
-            <Handle
-              key={port.id}
-              id={port.id}
-              type="target"
-              position={Position.Left}
-              className="!transition-all !duration-200"
-              style={{
-                top: `${topPct}%`,
-                width: Math.max(4, 6 * BLOCK_SCALE),
-                height: Math.max(4, 6 * BLOCK_SCALE),
-                background: hasError ? "#ef4444" : color,
-                border: "1px solid #111827",
-                boxShadow: `0 0 2px ${hasError ? "#ef4444" : color}40`,
-              }}
-            />
-          );
-        })}
-        {def.outputPorts.map((port, i) => {
-          const topPct = def.outputPorts.length === 1
-            ? 50
-            : 30 + (i / Math.max(def.outputPorts.length - 1, 1)) * 40;
-          return (
-            <Handle
-              key={port.id}
-              id={port.id}
-              type="source"
-              position={Position.Right}
-              className="!transition-all !duration-200"
-              style={{
-                top: `${topPct}%`,
-                width: Math.max(4, 6 * BLOCK_SCALE),
-                height: Math.max(4, 6 * BLOCK_SCALE),
-                background: hasError ? "#ef4444" : color,
-                border: "1px solid #111827",
-                boxShadow: `0 0 2px ${hasError ? "#ef4444" : color}40`,
-              }}
-            />
-          );
-        })}
+      {/* ═══ Shape bar — shown on hover ═══ */}
+      <div
+        className={`
+          px-4 py-1.5 text-[11px] font-mono border-t transition-all duration-200
+          ${hasError ? "border-[var(--danger)] bg-[var(--danger-muted)]" : "border-[var(--border)] bg-[var(--surface-elevated)]"}
+          ${!hasError && !showShape ? "opacity-60 group-hover/block:opacity-100" : ""}
+          rounded-b-2xl
+        `}
+        onMouseEnter={() => setShowShape(true)}
+        onMouseLeave={() => setShowShape(false)}
+      >
+        {hasError ? (
+          <div className="flex items-center gap-1.5">
+            <div className="relative">
+              <button
+                className="nodrag nopan text-[var(--danger)] hover:opacity-80 transition-colors"
+                onClick={() => setErrorTooltip((v) => !v)}
+              >
+                <AlertCircle size={12} />
+              </button>
+              {errorTooltip && (
+                <div className="absolute bottom-full left-0 mb-2 z-50 w-64 p-3 rounded-xl bg-[var(--surface)] border border-[var(--danger)] text-[12px] text-[var(--danger)] leading-relaxed shadow-lg">
+                  {result?.error}
+                </div>
+              )}
+            </div>
+            <span className="text-[var(--danger)] truncate flex-1">{result?.error}</span>
+          </div>
+        ) : (
+          <div
+            className="flex items-center gap-1.5"
+            title={getShapeLabelTooltip(result?.inputShape ?? null) || getShapeLabelTooltip(result?.outputShape ?? null) || undefined}
+          >
+            <span className="text-[var(--foreground-muted)]">{inLabel}</span>
+            <span className="text-[var(--foreground-muted)]">→</span>
+            <span className="font-medium" style={{ color }}>{outLabel}</span>
+          </div>
+        )}
       </div>
+
+      {/* ═══ Handles ═══ */}
+      {def.inputPorts.map((port, i) => {
+        const topPct = def.inputPorts.length === 1
+          ? 50
+          : 25 + (i / Math.max(def.inputPorts.length - 1, 1)) * 50;
+        return (
+          <Handle
+            key={port.id}
+            id={port.id}
+            type="target"
+            position={Position.Left}
+            className="!transition-all !duration-200"
+            style={{
+              top: `${topPct}%`,
+              width: 10,
+              height: 10,
+              background: hasError ? "var(--danger)" : "var(--block-surface)",
+              border: `2.5px solid ${hasError ? "var(--danger)" : color}`,
+              boxShadow: `0 0 0 2px var(--block-surface), 0 1px 3px rgba(0,0,0,0.1)`,
+            }}
+          />
+        );
+      })}
+      {def.outputPorts.map((port, i) => {
+        const topPct = def.outputPorts.length === 1
+          ? 50
+          : 25 + (i / Math.max(def.outputPorts.length - 1, 1)) * 50;
+        return (
+          <Handle
+            key={port.id}
+            id={port.id}
+            type="source"
+            position={Position.Right}
+            className="!transition-all !duration-200"
+            style={{
+              top: `${topPct}%`,
+              width: 10,
+              height: 10,
+              background: hasError ? "var(--danger)" : color,
+              border: `2.5px solid var(--block-surface)`,
+              boxShadow: `0 0 0 2px var(--block-surface), 0 1px 3px rgba(0,0,0,0.1)`,
+            }}
+          />
+        );
+      })}
     </div>
   );
 }

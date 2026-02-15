@@ -1,5 +1,9 @@
 "use client";
 
+// ---------------------------------------------------------------------------
+// TrainingPanel — v2: cleaner, friendlier, with beginner-friendly labels
+// ---------------------------------------------------------------------------
+
 import {
   useCallback,
   useEffect,
@@ -18,6 +22,7 @@ import {
 } from "@/neuralcanvas/lib/trainingApi";
 import type { TrainingStatus, EpochMetric, BatchUpdate } from "./types";
 import { LiveTrainingOverlay } from "./LiveTrainingOverlay";
+import { Play, Square, X, AlertTriangle, Database, Settings2, Zap } from "lucide-react";
 
 interface TrainingPanelProps {
   open: boolean;
@@ -35,6 +40,15 @@ const DEFAULT_CONFIG: TrainingConfigSchema = {
   train_split: 0.8,
 };
 
+/** Friendly explanations for each training setting */
+const SETTING_HINTS: Record<string, string> = {
+  epochs: "How many times the model sees the entire dataset",
+  batch_size: "How many samples the model processes at once",
+  learning_rate: "How big the learning steps are (smaller = more careful)",
+  optimizer: "The algorithm that adjusts the model weights",
+  train_split: "Fraction of data used for training (rest for validation)",
+};
+
 export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact }: TrainingPanelProps) {
   const [config, setConfig] = useState<TrainingConfigSchema>(DEFAULT_CONFIG);
   const [status, setStatus] = useState<TrainingStatus>("idle");
@@ -44,6 +58,7 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact }: 
   const [lastMessage, setLastMessage] = useState<Record<string, unknown> | null>(null);
   const [totalBatches, setTotalBatches] = useState<number | undefined>(undefined);
   const [latestBatch, setLatestBatch] = useState<BatchUpdate | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const closeWsRef = useRef<(() => void) | null>(null);
 
   const datasetId = useMemo(() => {
@@ -79,7 +94,6 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact }: 
     try {
       const { job_id } = await startTraining(graph, datasetId, config);
       setJobId(job_id);
-
       closeWsRef.current = openTrainingWebSocket(
         job_id,
         (msg) => {
@@ -91,14 +105,10 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact }: 
             if (typeof total === "number") setTotalBatches(total);
           }
           if (type === "batch") {
-            setLatestBatch({
-              epoch: msg.epoch as number,
-              batch: msg.batch as number,
-              loss: msg.loss as number,
-            });
+            setLatestBatch({ epoch: msg.epoch as number, batch: msg.batch as number, loss: msg.loss as number });
           }
           if (type === "epoch") {
-            setLatestBatch(null); // clear batch view once epoch completes
+            setLatestBatch(null);
             setMetrics((m) => [
               ...m,
               {
@@ -144,137 +154,177 @@ export function TrainingPanel({ open: isOpen, onClose, nodes, edges, compact }: 
     setStatus("stopped");
   }, [jobId]);
 
-  useEffect(() => {
-    return () => {
-      closeWsRef.current?.();
-    };
-  }, []);
+  useEffect(() => { return () => { closeWsRef.current?.(); }; }, []);
 
   if (!isOpen) return null;
+
+  const isTraining = status === "running" || status === "starting";
+
+  const inputClass = "w-full px-3 py-2.5 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-muted)] focus:border-[var(--accent)] transition-all";
 
   return (
     <div
       className={`
-        flex flex-col z-30 bg-neural-surface border-neural-border shadow-xl
+        flex flex-col z-30 bg-[var(--surface)] border-[var(--border)]
         ${compact
-          ? "absolute top-full right-0 mt-2 w-[340px] max-h-[70vh] rounded-xl border overflow-hidden"
-          : "absolute top-0 right-0 bottom-0 w-[380px] border-l"
+          ? "absolute top-full right-0 mt-2 w-[360px] max-h-[75vh] rounded-2xl border overflow-hidden shadow-xl"
+          : "absolute top-0 right-0 bottom-0 w-[400px] border-l shadow-xl"
         }
       `}
     >
-      <div className="flex items-center justify-between px-4 py-3 border-b border-neural-border">
-        <h2 className="text-sm font-semibold text-white font-mono">Training</h2>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-muted)]">
+            <Zap className="h-4 w-4 text-[var(--accent)]" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">Train Model</h2>
+            <p className="text-[11px] text-[var(--foreground-muted)]">Configure and run training</p>
+          </div>
+        </div>
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded text-neutral-400 hover:text-white hover:bg-neural-border transition-colors"
+          className="p-2 rounded-lg text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-colors"
           aria-label="Close panel"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
+          <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        {/* Warnings */}
         {graphError && (
-          <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs p-3 font-mono">
-            {graphError}
+          <div className="rounded-xl bg-[var(--warning-muted)] border border-[var(--warning)]/30 text-[var(--warning)] text-sm p-3 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>{graphError}</span>
           </div>
         )}
 
         {!datasetId && (
-          <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs p-3 font-mono">
+          <div className="rounded-xl bg-[var(--warning-muted)] border border-[var(--warning)]/30 text-[var(--warning)] text-sm p-3">
             Select a dataset on the Input block to train.
           </div>
         )}
 
+        {/* Essential settings */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-neutral-400 font-mono">Epochs</label>
+            <label className="block text-xs font-medium text-[var(--foreground-secondary)] mb-1.5">
+              Epochs
+            </label>
             <input
               type="number"
               min={1}
               max={500}
               value={config.epochs}
               onChange={(e) => setConfig((c) => ({ ...c, epochs: parseInt(e.target.value, 10) || 1 }))}
-              className="w-full px-3 py-2 rounded-lg bg-neural-bg border border-neural-border text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-neural-accent"
+              className={inputClass}
+              title={SETTING_HINTS.epochs}
             />
+            <p className="text-[11px] text-[var(--foreground-faint)] mt-1">{SETTING_HINTS.epochs}</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-neutral-400 font-mono">Batch size</label>
-            <input
-              type="number"
-              min={1}
-              value={config.batch_size}
-              onChange={(e) => setConfig((c) => ({ ...c, batch_size: parseInt(e.target.value, 10) || 1 }))}
-              className="w-full px-3 py-2 rounded-lg bg-neural-bg border border-neural-border text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-neural-accent"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-neutral-400 font-mono">Learning rate</label>
+            <label className="block text-xs font-medium text-[var(--foreground-secondary)] mb-1.5">
+              Learning Rate
+            </label>
             <input
               type="number"
               step="0.0001"
               min={0.00001}
               value={config.learning_rate}
               onChange={(e) => setConfig((c) => ({ ...c, learning_rate: parseFloat(e.target.value) || 0.001 }))}
-              className="w-full px-3 py-2 rounded-lg bg-neural-bg border border-neural-border text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-neural-accent"
+              className={inputClass}
+              title={SETTING_HINTS.learning_rate}
             />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-neutral-400 font-mono">Optimizer</label>
-            <select
-              value={config.optimizer}
-              onChange={(e) => setConfig((c) => ({ ...c, optimizer: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg bg-neural-bg border border-neural-border text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-neural-accent"
-            >
-              <option value="adam">Adam</option>
-              <option value="adamw">AdamW</option>
-              <option value="sgd">SGD</option>
-            </select>
+            <p className="text-[11px] text-[var(--foreground-faint)] mt-1">{SETTING_HINTS.learning_rate}</p>
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-neutral-400 font-mono">Train split</label>
-          <input
-            type="number"
-            step="0.05"
-            min={0.1}
-            max={0.99}
-            value={config.train_split}
-            onChange={(e) => setConfig((c) => ({ ...c, train_split: parseFloat(e.target.value) || 0.8 }))}
-            className="w-full px-3 py-2 rounded-lg bg-neural-bg border border-neural-border text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-neural-accent"
-          />
-        </div>
+        {/* Advanced settings toggle */}
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((s) => !s)}
+          className="flex items-center gap-2 text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+          <span>{showAdvanced ? "Hide" : "Show"} advanced settings</span>
+        </button>
 
+        {showAdvanced && (
+          <div className="grid grid-cols-2 gap-3 animate-fade-in">
+            <div>
+              <label className="block text-xs font-medium text-[var(--foreground-secondary)] mb-1.5">Batch Size</label>
+              <input
+                type="number"
+                min={1}
+                value={config.batch_size}
+                onChange={(e) => setConfig((c) => ({ ...c, batch_size: parseInt(e.target.value, 10) || 1 }))}
+                className={inputClass}
+                title={SETTING_HINTS.batch_size}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--foreground-secondary)] mb-1.5">Optimizer</label>
+              <select
+                value={config.optimizer}
+                onChange={(e) => setConfig((c) => ({ ...c, optimizer: e.target.value }))}
+                className={inputClass}
+                title={SETTING_HINTS.optimizer}
+              >
+                <option value="adam">Adam</option>
+                <option value="adamw">AdamW</option>
+                <option value="sgd">SGD</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-[var(--foreground-secondary)] mb-1.5">Train / Validation Split</label>
+              <input
+                type="number"
+                step="0.05"
+                min={0.1}
+                max={0.99}
+                value={config.train_split}
+                onChange={(e) => setConfig((c) => ({ ...c, train_split: parseFloat(e.target.value) || 0.8 }))}
+                className={inputClass}
+                title={SETTING_HINTS.train_split}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Error display */}
         {error && (
-          <div className="rounded-lg bg-red-500/10 border border-red-500/30 text-red-200 text-xs p-3 font-mono">
+          <div className="rounded-xl bg-[var(--danger-muted)] border border-[var(--danger)]/30 text-[var(--danger)] text-sm p-3">
             {error}
           </div>
         )}
 
+        {/* Action buttons */}
         <div className="flex gap-2">
           <button
             type="button"
             onClick={handleStart}
             disabled={!!graphError || !datasetId || status === "starting" || status === "running"}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-neural-accent hover:bg-neural-accent-light text-white text-sm font-mono font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
           >
-            {status === "starting" ? "Starting…" : status === "running" ? "Training…" : "Start training"}
+            <Play className="h-4 w-4" />
+            {status === "starting" ? "Starting..." : status === "running" ? "Training..." : "Start Training"}
           </button>
-          {(status === "running" || status === "starting") && (
+          {isTraining && (
             <button
               type="button"
               onClick={handleStop}
-              className="px-4 py-2.5 rounded-lg border border-neural-border text-neutral-300 hover:bg-neural-border text-sm font-mono transition-colors"
+              className="px-4 py-3 rounded-xl border border-[var(--border)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] text-sm font-medium transition-all flex items-center gap-2"
             >
+              <Square className="h-3.5 w-3.5" />
               Stop
             </button>
           )}
         </div>
 
+        {/* Live training overlay */}
         {status !== "idle" && (
           <LiveTrainingOverlay
             embedded

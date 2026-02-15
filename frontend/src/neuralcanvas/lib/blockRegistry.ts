@@ -78,6 +78,8 @@ export interface BlockDefinition {
   outputPorts: BlockPort[];
   /** Category-based colour for the node chrome (hex). */
   color: string;
+  /** Optional width in px; used when label is long (e.g. Positional Embedding). Default from BLOCK_BASE_WIDTH. */
+  width?: number;
   /** One-line plain-English description. */
   description: string;
 }
@@ -86,13 +88,25 @@ export interface BlockDefinition {
 // Category colours
 // ---------------------------------------------------------------------------
 const CATEGORY_COLORS: Record<BlockCategory, string> = {
-  input: "#f59e0b",        // amber
-  output: "#22c55e",       // green
-  layer: "#6366f1",        // indigo
-  normalization: "#14b8a6", // teal
-  activation: "#f43f5e",   // rose
-  utility: "#8b5cf6",      // violet
+  input: "#F59E0B",        // amber
+  output: "#10B981",       // emerald
+  layer: "#6366F1",        // indigo
+  normalization: "#14B8A6", // teal
+  activation: "#EF4444",   // red
+  utility: "#8B5CF6",      // violet
 };
+
+/** Per-block colors for blocks that need their own identity */
+const BLOCK_COLORS = {
+  Linear:              "#6366F1", // indigo
+  Conv2D:              "#8B5CF6", // violet
+  LSTM:                "#EC4899", // pink
+  Attention:           "#F97316", // orange
+  Embedding:           "#06B6D4", // cyan
+  TextEmbedding:       "#06B6D4", // cyan
+  PositionalEncoding:  "#0EA5E9", // sky
+  PositionalEmbedding: "#0EA5E9", // sky
+} as const;
 
 // ---------------------------------------------------------------------------
 // Block definitions
@@ -156,7 +170,7 @@ const LINEAR_BLOCK: BlockDefinition = {
   ],
   inputPorts: [{ id: "in", label: "Input", expectedDims: 2 }],
   outputPorts: [{ id: "out", label: "Output" }],
-  color: CATEGORY_COLORS.layer,
+  color: BLOCK_COLORS.Linear,
   description: "Fully-connected (dense) linear transformation.",
 };
 
@@ -182,7 +196,7 @@ const CONV2D_BLOCK: BlockDefinition = {
   ],
   inputPorts: [{ id: "in", label: "Input", expectedDims: 4 }],
   outputPorts: [{ id: "out", label: "Output" }],
-  color: CATEGORY_COLORS.layer,
+  color: BLOCK_COLORS.Conv2D,
   description: "2-D convolutional layer for spatial feature extraction.",
 };
 
@@ -203,7 +217,7 @@ const LSTM_BLOCK: BlockDefinition = {
     { id: "out", label: "Output" },
     { id: "hidden", label: "Hidden State" },
   ],
-  color: CATEGORY_COLORS.layer,
+  color: BLOCK_COLORS.LSTM,
   description: "Long Short-Term Memory recurrent layer.",
 };
 
@@ -220,7 +234,7 @@ const ATTENTION_BLOCK: BlockDefinition = {
   ],
   inputPorts: [{ id: "in", label: "Input", expectedDims: 3 }],
   outputPorts: [{ id: "out", label: "Output" }],
-  color: CATEGORY_COLORS.layer,
+  color: BLOCK_COLORS.Attention,
   description: "Multi-head self-attention mechanism.",
 };
 
@@ -267,7 +281,7 @@ const ACTIVATION_BLOCK: BlockDefinition = {
     {
       name: "activation",
       type: "select",
-      options: ["relu", "gelu", "sigmoid", "tanh", "softmax"],
+      options: ["relu", "gelu", "sigmoid", "tanh"],
     },
   ],
   inputPorts: [{ id: "in", label: "Input" }],
@@ -319,7 +333,7 @@ const EMBEDDING_BLOCK: BlockDefinition = {
   ],
   inputPorts: [{ id: "in", label: "Input", expectedDims: 2 }],
   outputPorts: [{ id: "out", label: "Output" }],
-  color: CATEGORY_COLORS.layer,
+  color: BLOCK_COLORS.Embedding,
   description: "Maps integer token IDs to dense embedding vectors.",
 };
 
@@ -336,7 +350,7 @@ const TEXT_EMBEDDING_BLOCK: BlockDefinition = {
   ],
   inputPorts: [{ id: "in", label: "Input", expectedDims: 2 }],
   outputPorts: [{ id: "out", label: "Output" }],
-  color: CATEGORY_COLORS.layer,
+  color: BLOCK_COLORS.TextEmbedding,
   description: "Token embeddings for text. Input [B, seq_len] → Output [B, seq_len, embedding_dim]. Pair with Text Input and Positional Embedding (d_model = embedding_dim).",
 };
 
@@ -353,8 +367,9 @@ const POSITIONAL_ENCODING_BLOCK: BlockDefinition = {
   ],
   inputPorts: [{ id: "in", label: "Input", expectedDims: 3 }],
   outputPorts: [{ id: "out", label: "Output" }],
-  color: CATEGORY_COLORS.layer,
+  color: BLOCK_COLORS.PositionalEncoding,
   description: "Adds sinusoidal positional encodings to sequences (Transformer-style). Input [B, seq, d_model].",
+  width: 252,
 };
 
 const POSITIONAL_EMBEDDING_BLOCK: BlockDefinition = {
@@ -370,8 +385,9 @@ const POSITIONAL_EMBEDDING_BLOCK: BlockDefinition = {
   ],
   inputPorts: [{ id: "in", label: "Input", expectedDims: 3 }],
   outputPorts: [{ id: "out", label: "Output" }],
-  color: CATEGORY_COLORS.layer,
+  color: BLOCK_COLORS.PositionalEmbedding,
   description: "Adds learned positional embeddings to sequences. Input [B, seq, d_model]. Set d_model to match Text Embedding embedding_dim.",
+  width: 252,
 };
 
 const SOFTMAX_BLOCK: BlockDefinition = {

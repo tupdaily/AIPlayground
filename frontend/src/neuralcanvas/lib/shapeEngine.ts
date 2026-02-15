@@ -751,6 +751,12 @@ export function validateConnection(
 // Shape formatting
 // ---------------------------------------------------------------------------
 
+/** Label shown when shape is unknown (e.g. no input connected). */
+export const UNKNOWN_SHAPE_LABEL = "ndim";
+
+/** Tooltip text when shape is unknown. */
+export const UNKNOWN_SHAPE_TOOLTIP = "Connect input to see shape";
+
 /**
  * Render a `Shape` as a human-readable label.
  *
@@ -758,13 +764,19 @@ export function validateConnection(
  *   [B, 1, 28, 28]  → "[B, 1, 28, 28]"
  *   [B, 784]         → "[B, 784]"
  *   [B, seq]         → "[B, seq]"
- *   null              → "?"
+ *   null             → "ndim" (tooltip: "Connect input to see shape")
  */
 export function getShapeLabel(shape: Shape | null): string {
-  if (!shape || shape.length === 0) return "?";
+  if (!shape || shape.length === 0) return UNKNOWN_SHAPE_LABEL;
   const parts = shape.map((d) => {
     if (typeof d === "number") return d.toString();
     return d; // "B" | "seq"
   });
   return `[${parts.join(", ")}]`;
+}
+
+/** Returns a tooltip for the shape label (e.g. when unknown). */
+export function getShapeLabelTooltip(shape: Shape | null): string {
+  if (!shape || shape.length === 0) return UNKNOWN_SHAPE_TOOLTIP;
+  return "";
 }

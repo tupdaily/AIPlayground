@@ -1,38 +1,43 @@
 "use client";
 
-// ---------------------------------------------------------------------------
-// OutputBlock — sink for model output (logits, loss, etc.)
-// ---------------------------------------------------------------------------
-
 import { memo } from "react";
 import type { Node, NodeProps } from "@xyflow/react";
 import { BaseBlock } from "./BaseBlock";
-import { useShapes } from "@/neuralcanvas/components/canvas/ShapeContext";
-import { getShapeLabel } from "@/neuralcanvas/lib/shapeEngine";
-import { CANVAS_UI_SCALE } from "@/neuralcanvas/lib/canvasConstants";
 
 interface BlockData extends Record<string, unknown> {
   params: Record<string, number | string>;
 }
 
-const s = CANVAS_UI_SCALE;
+/** Flag/finish node visualization */
+function OutputViz() {
+  return (
+    <svg width={160} height={36} viewBox="0 0 160 36">
+      {/* Input stream */}
+      <line x1={8} y1={18} x2={56} y2={18} stroke="#10B981" strokeWidth="1.5" opacity="0.75" />
+      <polygon points="54,15 60,18 54,21" fill="#10B981" opacity="0.85" />
+
+      {/* Checkered flag pattern */}
+      <rect x={64} y={6} width={6} height={6} fill="#10B981" opacity="0.85" />
+      <rect x={76} y={6} width={6} height={6} fill="#10B981" opacity="0.85" />
+      <rect x={70} y={12} width={6} height={6} fill="#10B981" opacity="0.85" />
+      <rect x={64} y={18} width={6} height={6} fill="#10B981" opacity="0.85" />
+      <rect x={76} y={18} width={6} height={6} fill="#10B981" opacity="0.85" />
+      <rect x={70} y={24} width={6} height={6} fill="#10B981" opacity="0.85" />
+
+      {/* Border */}
+      <rect x={63} y={5} width={20} height={26} rx={3} fill="none" stroke="#10B981" strokeWidth="1" opacity="0.75" />
+
+      {/* Predictions label */}
+      <text x={96} y={16} fontSize="8" fill="#10B981" opacity="0.9" fontWeight="600">Predictions</text>
+      <text x={96} y={26} fontSize="7" fill="#10B981" opacity="0.75">(logits / loss)</text>
+    </svg>
+  );
+}
 
 function OutputBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
-  const { shapes } = useShapes();
-  const result = shapes.get(id);
-  const inLabel = getShapeLabel(result?.inputShape ?? null);
-
   return (
-    <BaseBlock
-      id={id}
-      blockType="Output"
-      params={data?.params ?? {}}
-      selected={!!selected}
-    >
-      <div className="flex items-center justify-between gap-1 mt-0.5">
-        <span className="text-neutral-600 font-mono shrink-0" style={{ fontSize: `${7 * s}px` }}>in</span>
-        <span className="font-mono text-emerald-400/80 truncate min-w-0" style={{ fontSize: `${7 * s}px` }}>{inLabel}</span>
-      </div>
+    <BaseBlock id={id} blockType="Output" params={data?.params ?? {}} selected={!!selected}>
+      <OutputViz />
     </BaseBlock>
   );
 }

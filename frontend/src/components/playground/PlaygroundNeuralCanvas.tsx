@@ -469,7 +469,7 @@ export default function PlaygroundNeuralCanvas({
                     <button
                       type="button"
                       onClick={handleNext}
-                      disabled={!canNext || (hasQuiz && quizCorrect !== true)}
+                      disabled={!canNext || (!!hasQuiz && quizCorrect !== true)}
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-40 disabled:pointer-events-none bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300"
                     >
                       Next

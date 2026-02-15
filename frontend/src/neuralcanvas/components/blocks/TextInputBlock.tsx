@@ -1,45 +1,62 @@
 "use client";
 
-// ---------------------------------------------------------------------------
-// TextInputBlock — token IDs input for text/sequence models [B, seq_len]
-// ---------------------------------------------------------------------------
-
 import { memo } from "react";
 import type { Node, NodeProps } from "@xyflow/react";
 import { BaseBlock } from "./BaseBlock";
-import { useShapes } from "@/neuralcanvas/components/canvas/ShapeContext";
-import { getShapeLabel } from "@/neuralcanvas/lib/shapeEngine";
-import { CANVAS_UI_SCALE } from "@/neuralcanvas/lib/canvasConstants";
 
 interface BlockData extends Record<string, unknown> {
   params: Record<string, number | string>;
 }
 
-const s = CANVAS_UI_SCALE;
+/** Text tokens flowing in visualization */
+function TextInputViz({ seqLen }: { seqLen: number }) {
+  const tokens = Math.min(seqLen, 8);
+  const w = 160, h = 36;
+
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      {/* Token boxes */}
+      {Array.from({ length: tokens }).map((_, i) => (
+        <g key={i}>
+          <rect
+            x={10 + i * 18}
+            y={8}
+            width={14}
+            height={16}
+            rx={3}
+            fill="#F59E0B"
+            opacity={0.4 + (i / tokens) * 0.4}
+          />
+          <text
+            x={17 + i * 18}
+            y={20}
+            textAnchor="middle"
+            fontSize="7"
+            fill="#F59E0B"
+            opacity={0.85 + (i / tokens) * 0.15}
+            fontWeight="600"
+          >
+            {i + 1}
+          </text>
+        </g>
+      ))}
+      {tokens < seqLen && (
+        <text x={14 + tokens * 18} y={20} fontSize="8" fill="#F59E0B" opacity="0.75">...</text>
+      )}
+      {/* Label */}
+      <text x={10} y={h - 2} fontSize="7" fill="#F59E0B" opacity="0.85">
+        Token IDs [B, {seqLen}]
+      </text>
+    </svg>
+  );
+}
 
 function TextInputBlockComponent({ id, data, selected }: NodeProps<Node<BlockData>>) {
-  const { shapes } = useShapes();
-  const result = shapes.get(id);
-  const outLabel = getShapeLabel(result?.outputShape ?? null);
-  const batch = Number(data?.params?.batch_size ?? 1);
   const seqLen = Number(data?.params?.seq_len ?? 128);
 
   return (
-    <BaseBlock
-      id={id}
-      blockType="TextInput"
-      params={data?.params ?? {}}
-      selected={!!selected}
-    >
-      <div className="space-y-px mt-0.5 leading-none">
-        <div className="flex items-center justify-between gap-1">
-          <span className="text-neutral-600 font-mono shrink-0" style={{ fontSize: `${7 * s}px` }}>out</span>
-          <span className="font-mono text-amber-400/80 truncate min-w-0" style={{ fontSize: `${7 * s}px` }}>{outLabel}</span>
-        </div>
-        <p className="text-neutral-500 truncate" style={{ fontSize: `${6 * s}px` }}>
-          [B, seq] → {batch}×{seqLen}
-        </p>
-      </div>
+    <BaseBlock id={id} blockType="TextInput" params={data?.params ?? {}} selected={!!selected}>
+      <TextInputViz seqLen={seqLen} />
     </BaseBlock>
   );
 }

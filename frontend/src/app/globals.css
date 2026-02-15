@@ -1,64 +1,254 @@
 @import "tailwindcss";
 
+/* =========================================================================
+   AIPlayground — Design System v3 (Light Theme)
+   ========================================================================= 
+   A clean, warm light theme designed for learning and exploration.
+   Inspired by Lobe.ai, Apple HIG, and Figment — the UI recedes so
+   the content (your neural network) comes forward.
+   Target audience: age 12+, non-AI users, curious learners.
+   ========================================================================= */
+
 :root {
-  --background: #0c0f14;
-  --surface: #13171f;
-  --surface-elevated: #1a1f2a;
-  --border: #2a3142;
-  --border-muted: #1e2430;
-  --foreground: #e4e8f0;
-  --foreground-muted: #8b92a6;
-  --accent: #06b6d4;
-  --accent-hover: #22d3ee;
-  --accent-muted: rgba(6, 182, 212, 0.15);
-  --success: #10b981;
-  --success-muted: rgba(16, 185, 129, 0.15);
-  --danger: #ef4444;
-  --danger-muted: rgba(239, 68, 68, 0.15);
-  --warning: #f59e0b;
-  --glow: 0 0 20px rgba(6, 182, 212, 0.15);
-  --radius: 8px;
-  --radius-lg: 12px;
-  /* NeuralCanvas theme (for playground) */
-  --neural-bg: #0b0f1a;
-  --neural-surface: #111827;
-  --neural-border: #1f2937;
-  --neural-muted: #6b7280;
-  --neural-accent: #8b5cf6;
-  --neural-accent-light: #a78bfa;
-  --neural-success: #10b981;
-  --neural-warning: #f59e0b;
-  --neural-error: #ef4444;
+  color-scheme: light;
+
+  /* ── Core Palette ────────────────────────────────────────────────────── */
+  --background:         #FAFBFC;
+  --background-subtle:  #F4F5F7;
+  --surface:            #FFFFFF;
+  --surface-elevated:   #F7F8FA;
+  --surface-hover:      #F0F1F4;
+
+  /* ── Borders ─────────────────────────────────────────────────────────── */
+  --border:             #E5E7EB;
+  --border-muted:       #F0F1F3;
+  --border-strong:      #D1D5DB;
+
+  /* ── Text ────────────────────────────────────────────────────────────── */
+  --foreground:         #1A1D23;
+  --foreground-secondary: #4B5563;
+  --foreground-muted:   #9CA3AF;
+  --foreground-faint:   #D1D5DB;
+
+  /* ── Accent (indigo — vibrant on white) ──────────────────────────────── */
+  --accent:             #6366F1;
+  --accent-hover:       #4F46E5;
+  --accent-muted:       rgba(99, 102, 241, 0.08);
+  --accent-strong:      rgba(99, 102, 241, 0.16);
+  --accent-glow:        0 0 24px rgba(99, 102, 241, 0.08);
+
+  /* ── Semantic Colors ─────────────────────────────────────────────────── */
+  --success:            #10B981;
+  --success-muted:      rgba(16, 185, 129, 0.08);
+  --success-strong:     rgba(16, 185, 129, 0.16);
+  --danger:             #EF4444;
+  --danger-muted:       rgba(239, 68, 68, 0.08);
+  --danger-strong:      rgba(239, 68, 68, 0.16);
+  --warning:            #F59E0B;
+  --warning-muted:      rgba(245, 158, 11, 0.08);
+  --info:               #3B82F6;
+  --info-muted:         rgba(59, 130, 246, 0.08);
+
+  /* ── Block Colors (each block type gets its OWN color) ───────────────── */
+  --block-input:        #F59E0B;
+  --block-output:       #10B981;
+  --block-linear:       #6366F1;
+  --block-conv:         #8B5CF6;
+  --block-lstm:         #EC4899;
+  --block-attention:    #F97316;
+  --block-activation:   #EF4444;
+  --block-norm:         #14B8A6;
+  --block-utility:      #8B5CF6;
+  --block-embedding:    #06B6D4;
+  --block-positional:   #0EA5E9;
+
+  /* legacy aliases */
+  --block-layer:        #6366F1;
+
+  /* ── Radii ───────────────────────────────────────────────────────────── */
+  --radius-sm:          8px;
+  --radius:             12px;
+  --radius-lg:          16px;
+  --radius-xl:          24px;
+
+  /* ── Shadows (light and airy) ────────────────────────────────────────── */
+  --shadow-sm:          0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md:          0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg:          0 8px 30px rgba(0, 0, 0, 0.08);
+  --shadow-xl:          0 16px 48px rgba(0, 0, 0, 0.10);
+  --shadow-glow:        0 0 30px rgba(99, 102, 241, 0.06);
+  --shadow-card:        0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  --shadow-card-hover:  0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04);
+
+  /* ── Typography ──────────────────────────────────────────────────────── */
+  --text-xs:            0.75rem;
+  --text-sm:            0.8125rem;
+  --text-base:          0.875rem;
+  --text-md:            0.9375rem;
+  --text-lg:            1.0625rem;
+  --text-xl:            1.25rem;
+  --text-2xl:           1.5rem;
+  --text-3xl:           1.875rem;
+
+  /* ── Transitions ─────────────────────────────────────────────────────── */
+  --transition-fast:    120ms ease;
+  --transition-base:    200ms ease;
+  --transition-slow:    350ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── NeuralCanvas aliases ────────────────────────────────────────────── */
+  --neural-bg:          #F8F9FB;
+  --neural-surface:     var(--surface);
+  --neural-border:      var(--border);
+  --neural-muted:       var(--foreground-muted);
+  --neural-accent:      var(--accent);
+  --neural-accent-light: var(--accent-hover);
+  --neural-success:     var(--success);
+  --neural-warning:     var(--warning);
+  --neural-error:       var(--danger);
+
+  /* ── Block card surface (for dark mode overrides) ──────────────────── */
+  --block-surface:      #FFFFFF;
+  --block-surface-elevated: #F7F8FA;
+
+  /* ── Connectors (wires between blocks) — visible on canvas ──────────── */
+  --connector-stroke:   #6B7280;
 }
 
+/* =========================================================================
+   Dark Theme (activated via html[data-theme="dark"] from next-themes)
+   ========================================================================= */
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* ── Core Palette ────────────────────────────────────────────────────── */
+  --background:         #0F1117;
+  --background-subtle:  #161921;
+  --surface:            #1A1D27;
+  --surface-elevated:   #22252F;
+  --surface-hover:      #2A2D38;
+
+  /* ── Borders ─────────────────────────────────────────────────────────── */
+  --border:             #2E3140;
+  --border-muted:       #252836;
+  --border-strong:      #3D4155;
+
+  /* ── Text ────────────────────────────────────────────────────────────── */
+  --foreground:         #E8EAED;
+  --foreground-secondary: #9BA1B0;
+  --foreground-muted:   #6B7280;
+  --foreground-faint:   #3D4155;
+
+  /* ── Accent (slightly brighter on dark) ────────────────────────────── */
+  --accent:             #818CF8;
+  --accent-hover:       #6366F1;
+  --accent-muted:       rgba(129, 140, 248, 0.12);
+  --accent-strong:      rgba(129, 140, 248, 0.22);
+  --accent-glow:        0 0 24px rgba(129, 140, 248, 0.15);
+
+  /* ── Semantic Colors ─────────────────────────────────────────────────── */
+  --success:            #34D399;
+  --success-muted:      rgba(52, 211, 153, 0.12);
+  --success-strong:     rgba(52, 211, 153, 0.22);
+  --danger:             #F87171;
+  --danger-muted:       rgba(248, 113, 113, 0.12);
+  --danger-strong:      rgba(248, 113, 113, 0.22);
+  --warning:            #FBBF24;
+  --warning-muted:      rgba(251, 191, 36, 0.12);
+  --info:               #60A5FA;
+  --info-muted:         rgba(96, 165, 250, 0.12);
+
+  /* ── Shadows (deeper for dark) ─────────────────────────────────────── */
+  --shadow-sm:          0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md:          0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg:          0 8px 30px rgba(0, 0, 0, 0.5);
+  --shadow-xl:          0 16px 48px rgba(0, 0, 0, 0.6);
+  --shadow-glow:        0 0 30px rgba(129, 140, 248, 0.12);
+  --shadow-card:        0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+  --shadow-card-hover:  0 4px 16px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3);
+
+  /* ── NeuralCanvas aliases ──────────────────────────────────────────── */
+  --neural-bg:          #12141C;
+  --neural-surface:     var(--surface);
+  --neural-border:      var(--border);
+  --neural-muted:       var(--foreground-muted);
+  --neural-accent:      var(--accent);
+  --neural-accent-light: var(--accent-hover);
+  --neural-success:     var(--success);
+  --neural-warning:     var(--warning);
+  --neural-error:       var(--danger);
+
+  /* ── Block card surface ────────────────────────────────────────────── */
+  --block-surface:      #1E2130;
+  --block-surface-elevated: #252838;
+
+  /* ── Connectors ────────────────────────────────────────────────────── */
+  --connector-stroke:   #94A3B8;
+}
+
+/* ── Tailwind Theme Integration ──────────────────────────────────────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  /* NeuralCanvas palette */
-  --color-neural-bg: var(--neural-bg);
-  --color-neural-surface: var(--neural-surface);
-  --color-neural-border: var(--neural-border);
-  --color-neural-muted: var(--neural-muted);
-  --color-neural-accent: var(--neural-accent);
-  --color-neural-accent-light: var(--neural-accent-light);
-  --color-neural-success: var(--neural-success);
-  --color-neural-warning: var(--neural-warning);
-  --color-neural-error: var(--neural-error);
+  --color-background:           var(--background);
+  --color-foreground:           var(--foreground);
+  --font-sans:                  var(--font-inter);
+  --font-mono:                  var(--font-jetbrains-mono);
+  --color-neural-bg:            var(--neural-bg);
+  --color-neural-surface:       var(--neural-surface);
+  --color-neural-border:        var(--neural-border);
+  --color-neural-muted:         var(--neural-muted);
+  --color-neural-accent:        var(--neural-accent);
+  --color-neural-accent-light:  var(--neural-accent-light);
+  --color-neural-success:       var(--neural-success);
+  --color-neural-warning:       var(--neural-warning);
+  --color-neural-error:         var(--neural-error);
 }
 
+/* ── Base Styles ─────────────────────────────────────────────────────── */
 * {
-  border-color: var(--border-muted);
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* React Flow overrides for dark theme */
+/* ── Focus Accessibility ─────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground-muted);
+}
+
+/* ── Selection ───────────────────────────────────────────────────────── */
+::selection {
+  background: var(--accent-strong);
+  color: white;
+}
+
+/* =========================================================================
+   React Flow Overrides — clean light canvas
+   ========================================================================= */
 .react-flow__node {
   background: transparent !important;
   padding: 0 !important;
@@ -68,7 +258,6 @@ body {
   box-shadow: none !important;
 }
 
-/* Remove default input/output node styling so custom nodes aren't wrapped in a box */
 .react-flow__node-input,
 .react-flow__node-output,
 .react-flow__node-default {
@@ -81,11 +270,11 @@ body {
 }
 
 .react-flow__background {
-  background: var(--background) !important;
+  background: var(--neural-bg) !important;
 }
 
 .react-flow__edge-path {
-  stroke: var(--border);
+  stroke: var(--connector-stroke);
   stroke-width: 1.5;
 }
 
@@ -95,48 +284,33 @@ body {
   animation: dash 0.5s linear infinite;
 }
 
-@keyframes dash {
-  to {
-    stroke-dashoffset: -10;
-  }
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-4px); }
-  40% { transform: translateX(4px); }
-  60% { transform: translateX(-2px); }
-  80% { transform: translateX(2px); }
-}
-
-.animate-shake {
-  animation: shake 0.4s ease-in-out;
-}
-
 .react-flow__controls {
-  background: var(--surface-elevated) !important;
+  background: var(--surface) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius) !important;
-  box-shadow: none !important;
+  box-shadow: var(--shadow-md) !important;
+  overflow: hidden;
 }
 
 .react-flow__controls-button {
-  background: var(--surface-elevated) !important;
-  border-bottom: 1px solid var(--border-muted) !important;
+  background: var(--surface) !important;
+  border-bottom: 1px solid var(--border) !important;
   color: var(--foreground-muted) !important;
   fill: var(--foreground-muted) !important;
+  transition: all var(--transition-fast);
 }
 
 .react-flow__controls-button:hover {
-  background: var(--surface) !important;
+  background: var(--surface-hover) !important;
   color: var(--accent) !important;
   fill: var(--accent) !important;
 }
 
 .react-flow__minimap {
-  background: var(--surface-elevated) !important;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 
 .react-flow__attribution {
@@ -145,5 +319,107 @@ body {
 
 .react-flow__attribution a {
   color: var(--foreground-muted) !important;
-  opacity: 0.5;
+  opacity: 0.3;
+}
+
+/* React Flow dark mode overrides */
+html[data-theme="dark"] .react-flow__background {
+  background: var(--neural-bg) !important;
+}
+html[data-theme="dark"] .react-flow__minimap-mask {
+  fill: rgba(15, 17, 23, 0.85) !important;
+}
+
+/* =========================================================================
+   Animations
+   ========================================================================= */
+@keyframes dash {
+  to { stroke-dashoffset: -10; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-4px); }
+  40%      { transform: translateX(4px); }
+  60%      { transform: translateX(-2px); }
+  80%      { transform: translateX(2px); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-6px); }
+}
+
+.animate-shake      { animation: shake 0.4s ease-in-out; }
+.animate-fade-in    { animation: fadeIn 0.3s ease-out; }
+.animate-slide-up   { animation: slideUp 0.4s ease-out; }
+.animate-pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }
+.animate-float      { animation: float 3s ease-in-out infinite; }
+.animate-shimmer    {
+  background: linear-gradient(90deg, var(--surface-elevated) 25%, var(--surface) 50%, var(--surface-elevated) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* =========================================================================
+   Utility Classes
+   ========================================================================= */
+
+.glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+}
+html[data-theme="dark"] .glass {
+  background: rgba(26, 29, 39, 0.85);
+}
+
+.card-hover {
+  transition: all var(--transition-base);
+}
+.card-hover:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent), #8B5CF6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Block node card on canvas */
+.block-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition: all var(--transition-base);
+}
+.block-card:hover,
+.block-card.selected {
+  box-shadow: var(--shadow-card-hover);
 }

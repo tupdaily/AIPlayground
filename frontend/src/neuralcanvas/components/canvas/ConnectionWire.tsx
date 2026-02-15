@@ -1,8 +1,7 @@
 "use client";
 
 // ---------------------------------------------------------------------------
-// ConnectionWire — custom React Flow edge with animated bezier, shape badge,
-// three-state colour coding, and rich hover tooltip.
+// ConnectionWire — v3 Light Theme: clean white pills, colored flow dots
 // ---------------------------------------------------------------------------
 
 import { memo, useState, useMemo } from "react";
@@ -16,6 +15,7 @@ import {
 import { useShapes } from "./ShapeContext";
 import {
   getShapeLabel,
+  getShapeLabelTooltip,
   type Shape,
   type Dim,
 } from "@/neuralcanvas/lib/shapeEngine";
@@ -23,13 +23,37 @@ import { BLOCK_REGISTRY, type BlockType } from "@/neuralcanvas/lib/blockRegistry
 import { CANVAS_UI_SCALE, SHAPE_LABEL_SCALE } from "@/neuralcanvas/lib/canvasConstants";
 
 // ---------------------------------------------------------------------------
-// Colour constants for the three states
+// Colors for the three states — light theme
 // ---------------------------------------------------------------------------
 
+// Colors now use CSS variables for theme awareness.
+// Since these are used inline in SVGs, we read computed values at render time
+// via a helper, but for the most part we reference CSS vars directly in JSX.
 const COLORS = {
-  valid: { stroke: "#4b5563", glow: "#22c55e20", bg: "rgba(22,101,52,0.85)", border: "rgba(34,197,94,0.5)", text: "#bbf7d0" },
-  error: { stroke: "#ef4444", glow: "#ef444420", bg: "rgba(69,10,10,0.90)", border: "rgba(239,68,68,0.5)", text: "#fecaca" },
-  unknown: { stroke: "#4b5563", glow: "#6b728020", bg: "rgba(31,41,55,0.85)", border: "rgba(107,114,128,0.4)", text: "#9ca3af" },
+  valid: {
+    stroke: "var(--connector-stroke)",
+    dotStroke: "var(--accent)",
+    bg: "var(--surface)",
+    border: "var(--border)",
+    text: "var(--foreground)",
+    dot: "var(--success)",
+  },
+  error: {
+    stroke: "var(--danger)",
+    dotStroke: "var(--danger)",
+    bg: "var(--danger-muted)",
+    border: "var(--danger)",
+    text: "var(--danger)",
+    dot: "var(--danger)",
+  },
+  unknown: {
+    stroke: "var(--connector-stroke)",
+    dotStroke: "var(--foreground-muted)",
+    bg: "var(--surface-elevated)",
+    border: "var(--border)",
+    text: "var(--foreground-muted)",
+    dot: "var(--foreground-muted)",
+  },
 } as const;
 
 type WireState = keyof typeof COLORS;
@@ -39,30 +63,38 @@ type WireState = keyof typeof COLORS;
 // ---------------------------------------------------------------------------
 
 function describeShape(shape: Shape | null): string {
-  if (!shape || shape.length === 0) return "Unknown shape";
+  if (!shape || shape.length === 0) return "Shape not yet resolved";
 
   const rank = shape.length;
   const dimStr = (d: Dim) => (typeof d === "number" ? d.toString() : d);
-
-  // Skip batch dim for the description.
   const inner = shape.slice(1);
 
-  if (rank === 1) return `Scalar values`;
+  if (rank === 1) return "Scalar values";
   if (rank === 2) {
     const last = inner[0];
     if (last === "seq") return "Variable-length sequences";
-    return `Batch of ${dimStr(last)}-dimensional vectors`;
+    return `${dimStr(last)} values per sample`;
   }
   if (rank === 3) {
     const [d1, d2] = inner;
-    if (d1 === "seq") return `Sequences of ${dimStr(d2)}-dimensional embeddings`;
-    return `Batch of ${dimStr(d1)}×${dimStr(d2)} matrices`;
+    if (d1 === "seq") return `Sequences of ${dimStr(d2)}-dim embeddings`;
+    return `${dimStr(d1)} x ${dimStr(d2)} matrix per sample`;
   }
   if (rank === 4) {
     const [c, h, w] = inner;
-    return `${dimStr(c)}-channel feature maps (${dimStr(h)}×${dimStr(w)})`;
+    return `${dimStr(c)}-channel ${dimStr(h)}x${dimStr(w)} feature maps`;
   }
   return `${rank}D tensor`;
+}
+
+// ---------------------------------------------------------------------------
+// Get source block accent color for flow dots
+// ---------------------------------------------------------------------------
+
+function getSourceColor(sourceType: string | undefined): string {
+  if (!sourceType) return "#6366F1";
+  const def = BLOCK_REGISTRY[sourceType as BlockType];
+  return def?.color ?? "#6366F1";
 }
 
 // ---------------------------------------------------------------------------
@@ -88,30 +120,26 @@ function ConnectionWireComponent({
   const nodes = useNodes();
   const [hovered, setHovered] = useState(false);
 
-  // ── Resolve shape data ──
   const sourceResult = shapes.get(source);
   const targetResult = shapes.get(target);
   const outputShape = sourceResult?.outputShape ?? null;
   const shapeLabel = getShapeLabel(outputShape);
 
-  // Error from validation at connection time OR from live propagation.
   const edgeError = (data?.error as string) || targetResult?.error || "";
   const hasError = !!edgeError;
   const hasShape = outputShape !== null && outputShape.length > 0;
 
-  // Determine wire state.
   const wireState: WireState = hasError ? "error" : hasShape ? "valid" : "unknown";
   const colors = COLORS[wireState];
 
-  // ── Node labels for the tooltip ──
   const sourceNode = nodes.find((n) => n.id === source);
   const targetNode = nodes.find((n) => n.id === target);
   const sourceLabel =
     BLOCK_REGISTRY[sourceNode?.type as BlockType]?.label ?? sourceNode?.type ?? "?";
   const targetLabel =
     BLOCK_REGISTRY[targetNode?.type as BlockType]?.label ?? targetNode?.type ?? "?";
+  const accentColor = getSourceColor(sourceNode?.type);
 
-  // ── Bezier path ──
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -121,40 +149,56 @@ function ConnectionWireComponent({
     targetPosition,
   });
 
-  // ── Human-readable description for tooltip ──
   const description = useMemo(() => {
-    if (!hasShape) return "Shape not yet resolved — connect upstream blocks.";
-    const shapeDesc = describeShape(outputShape);
-    return `${shapeDesc} flowing from ${sourceLabel} to ${targetLabel}`;
-  }, [hasShape, outputShape, sourceLabel, targetLabel]);
+    if (!hasShape) return "Connect upstream blocks to see the data shape here.";
+    return describeShape(outputShape);
+  }, [hasShape, outputShape]);
+
+  const s = CANVAS_UI_SCALE * SHAPE_LABEL_SCALE;
 
   return (
     <>
-      {/* ── Solid connection line (no animation) ── */}
+      {/* Main connection line */}
       <BaseEdge
         path={edgePath}
         markerEnd={markerEnd}
         style={{
           ...style,
           stroke: colors.stroke,
-          strokeWidth: selected ? 2 : 1.5,
+          strokeWidth: selected || hovered ? 2.5 : 1.5,
           strokeLinecap: "round",
           transition: "stroke 0.2s ease, stroke-width 0.2s ease",
         }}
       />
 
-      {/* ── Invisible hit area for hover (wider than visible stroke) ── */}
+      {/* Animated flow dots on valid connections — uses source block's accent color */}
+      {wireState === "valid" && (
+        <path
+          d={edgePath}
+          fill="none"
+          stroke={accentColor}
+          strokeWidth={2.5}
+          strokeDasharray="3 14"
+          strokeLinecap="round"
+          opacity={0.35}
+          style={{
+            animation: "connectionDotFlow 2s linear infinite",
+          }}
+        />
+      )}
+
+      {/* Invisible hit area */}
       <path
         d={edgePath}
         fill="none"
         stroke="transparent"
-        strokeWidth={20}
+        strokeWidth={24}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{ cursor: "pointer" }}
       />
 
-      {/* ── Shape pill badge at midpoint ── */}
+      {/* Shape pill badge */}
       <EdgeLabelRenderer>
         <div
           style={{
@@ -167,63 +211,65 @@ function ConnectionWireComponent({
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
-          {/* Pill badge — scaled smaller than blocks */}
           <div
             className="
               relative rounded-full
               font-mono font-medium leading-none
-              backdrop-blur-md shadow-lg
               border
-              transition-all duration-300 ease-out
+              transition-all duration-200 ease-out
               select-none cursor-default
             "
+            title={getShapeLabelTooltip(outputShape)}
             style={{
-              padding: `${4 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE}px ${8 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE}px`,
-              fontSize: `${9 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE}px`,
+              padding: `${4 * s}px ${10 * s}px`,
+              fontSize: `${Math.max(11, 11 * s)}px`,
               backgroundColor: colors.bg,
               borderColor: colors.border,
               color: colors.text,
-              boxShadow: `0 0 8px ${colors.glow}, 0 2px 8px rgba(0,0,0,0.3)`,
-              transform: hovered ? "scale(1.08)" : "scale(1)",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+              transform: hovered ? "scale(1.06)" : "scale(1)",
             }}
           >
-            {/* Dot indicator */}
+            {/* Status dot */}
             <span
               className="inline-block rounded-full align-middle"
               style={{
-                width: 3 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE,
-                height: 3 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE,
-                marginRight: 4 * CANVAS_UI_SCALE * SHAPE_LABEL_SCALE,
-                backgroundColor: colors.stroke,
-                boxShadow: `0 0 4px ${colors.stroke}`,
+                width: 5,
+                height: 5,
+                marginRight: 5,
+                backgroundColor: colors.dot,
+                boxShadow: wireState === "valid"
+                  ? `0 0 4px ${colors.dot}`
+                  : wireState === "error"
+                    ? `0 0 4px ${colors.dot}`
+                    : "none",
               }}
             />
-            {wireState === "error" ? "⚠ mismatch" : shapeLabel}
+            {wireState === "error" ? "Mismatch" : shapeLabel}
           </div>
 
-          {/* ── Compact hover tooltip ── */}
+          {/* Hover tooltip */}
           {hovered && (
             <div
-              className="absolute left-1/2 -translate-x-1/2 mt-1.5 z-50 rounded-md border shadow-lg backdrop-blur-sm animate-fade-in max-w-[200px] truncate"
+              className="absolute left-1/2 -translate-x-1/2 mt-2 z-50 rounded-xl border shadow-lg animate-fade-in"
               style={{
-                padding: "4px 8px",
-                backgroundColor: colors.bg,
-                borderColor: colors.border,
-                fontSize: "10px",
-                color: colors.text,
+                padding: "10px 14px",
+                backgroundColor: "var(--surface)",
+                borderColor: "var(--border)",
+                minWidth: 170,
+                maxWidth: 280,
               }}
-              title={description}
             >
-              <span className="font-mono font-medium">{shapeLabel}</span>
-              <span className="text-neutral-500 mx-1.5">·</span>
-              <span className="text-neutral-500 font-mono text-[9px]">
+              <p className="text-[12px] leading-relaxed mb-1 text-[var(--foreground-secondary)]">
+                {description}
+              </p>
+              <p className="text-[11px] text-[var(--foreground-muted)] font-mono">
                 {sourceLabel} → {targetLabel}
-              </span>
+              </p>
               {hasError && (
-                <>
-                  <span className="text-neutral-600 mx-1.5">·</span>
-                  <span className="text-red-400 text-[9px] truncate">{edgeError}</span>
-                </>
+                <p className="text-[11px] text-[var(--danger)] mt-1 leading-snug">
+                  {edgeError}
+                </p>
               )}
             </div>
           )}
@@ -236,7 +282,7 @@ function ConnectionWireComponent({
 export const ConnectionWire = memo(ConnectionWireComponent);
 
 // ---------------------------------------------------------------------------
-// Global keyframes (injected once)
+// Global keyframes
 // ---------------------------------------------------------------------------
 
 if (typeof document !== "undefined") {
@@ -245,9 +291,6 @@ if (typeof document !== "undefined") {
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-      @keyframes connectionFlowDash {
-        to { stroke-dashoffset: -10; }
-      }
       @keyframes connectionDotFlow {
         0%   { stroke-dashoffset: 0; }
         100% { stroke-dashoffset: -60; }

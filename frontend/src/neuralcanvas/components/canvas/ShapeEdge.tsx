@@ -12,7 +12,7 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 import { useShapes } from "./ShapeContext";
-import { getShapeLabel } from "@/neuralcanvas/lib/shapeEngine";
+import { getShapeLabel, getShapeLabelTooltip } from "@/neuralcanvas/lib/shapeEngine";
 
 function ShapeEdgeComponent({
   id,
@@ -83,7 +83,7 @@ function ShapeEdgeComponent({
                   : "bg-neural-surface/90 border-neural-border text-neural-accent-light"
               }
             `}
-            title={hasError ? errorMsg : shapeLabel}
+            title={hasError ? errorMsg : getShapeLabelTooltip(sourceResult?.outputShape ?? null) || shapeLabel}
           >
             {hasError ? "⚠ error" : shapeLabel}
           </div>

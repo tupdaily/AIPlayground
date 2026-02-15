@@ -1,7 +1,11 @@
 "use client";
 
 // ---------------------------------------------------------------------------
-// BlockNode — generic custom React Flow node for every block type
+// BlockNode — v3 light theme: fallback renderer for any block type
+// ---------------------------------------------------------------------------
+// This is the generic fallback. The specific block components (LinearBlock,
+// Conv2DBlock, etc.) are used when registered in nodeTypes. This component
+// renders when a block type doesn't have a dedicated component.
 // ---------------------------------------------------------------------------
 
 import { memo, useMemo } from "react";
@@ -11,8 +15,9 @@ import {
   type BlockType,
   type BlockDefinition,
 } from "@/neuralcanvas/lib/blockRegistry";
-import { getShapeLabel } from "@/neuralcanvas/lib/shapeEngine";
+import { getShapeLabel, getShapeLabelTooltip } from "@/neuralcanvas/lib/shapeEngine";
 import { useShapes } from "./ShapeContext";
+import { BLOCK_BASE_WIDTH } from "@/neuralcanvas/lib/canvasConstants";
 import {
   Inbox,
   Target,
@@ -31,7 +36,7 @@ import {
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
-// Icon lookup (lucide icon name → component)
+// Icon lookup
 // ---------------------------------------------------------------------------
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -50,9 +55,19 @@ const ICON_MAP: Record<string, LucideIcon> = {
   percent: Percent,
 };
 
-// ---------------------------------------------------------------------------
-// Param summary (compact one-liner for the node body)
-// ---------------------------------------------------------------------------
+const FRIENDLY_NAMES: Record<string, string> = {
+  in_features: "in",
+  out_features: "out",
+  in_channels: "in ch",
+  out_channels: "out ch",
+  kernel_size: "filter",
+  embed_dim: "dim",
+  num_heads: "heads",
+  activation: "fn",
+  p: "drop",
+  hidden_size: "hidden",
+  num_layers: "layers",
+};
 
 function paramSummary(
   def: BlockDefinition,
@@ -62,7 +77,8 @@ function paramSummary(
   return def.paramSchema
     .map((s) => {
       const val = params[s.name] ?? def.defaultParams[s.name] ?? "?";
-      return `${s.name}: ${val}`;
+      const name = FRIENDLY_NAMES[s.name] ?? s.name;
+      return `${name}: ${val}`;
     })
     .join(" · ");
 }
@@ -83,7 +99,7 @@ function BlockNodeComponent({ id, type, data, selected }: NodeProps<Node<BlockNo
 
   const params = data?.params ?? {};
   const Icon = def ? ICON_MAP[def.icon] : null;
-  const color = def?.color ?? "#6366f1";
+  const color = def?.color ?? "#6366F1";
 
   const summary = useMemo(
     () => (def ? paramSummary(def, params) : ""),
@@ -95,7 +111,7 @@ function BlockNodeComponent({ id, type, data, selected }: NodeProps<Node<BlockNo
 
   if (!def) {
     return (
-      <div className="px-3 py-2 rounded-lg bg-red-950 border border-red-500 text-red-300 text-xs">
+      <div className="px-4 py-3 rounded-xl bg-[var(--danger-muted)] border border-[var(--danger)] text-[var(--danger)] text-sm">
         Unknown block: {type}
       </div>
     );
@@ -104,87 +120,104 @@ function BlockNodeComponent({ id, type, data, selected }: NodeProps<Node<BlockNo
   return (
     <div
       className={`
-        group relative min-w-[170px] max-w-[220px]
-        rounded-xl border shadow-lg
-        transition-all duration-150
-        ${selected ? "ring-2 ring-white/30 scale-[1.02]" : ""}
-        ${hasError ? "border-red-500/70" : "border-neural-border"}
-        bg-neural-surface
+        group relative
+        rounded-2xl border bg-[var(--block-surface)]
+        transition-all duration-200
+        ${selected ? "ring-2 ring-[var(--accent-strong)] shadow-lg scale-[1.01]" : "shadow-[var(--shadow-card)]"}
+        ${hasError ? "border-[var(--danger)]" : selected ? "border-[var(--accent)]" : "border-[var(--border)] hover:shadow-[var(--shadow-card-hover)]"}
       `}
-      style={{
-        boxShadow: `0 0 12px ${color}22`,
-      }}
+      style={{ width: BLOCK_REGISTRY[blockType]?.width ?? BLOCK_BASE_WIDTH }}
     >
-      {/* ── Header bar ── */}
+      {/* Colored left accent bar */}
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-t-xl"
-        style={{ backgroundColor: `${color}18` }}
-      >
-        {Icon && <Icon size={14} style={{ color }} className="shrink-0" />}
-        <span
-          className="text-xs font-semibold tracking-wide truncate"
-          style={{ color }}
-        >
+        className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
+        style={{ backgroundColor: color }}
+      />
+
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-4 pt-3 pb-2">
+        {Icon && (
+          <div
+            className="flex items-center justify-center w-7 h-7 rounded-lg shrink-0"
+            style={{ backgroundColor: `${color}12` }}
+          >
+            <Icon size={14} style={{ color }} />
+          </div>
+        )}
+        <span className="text-[13px] font-bold text-[var(--foreground)] truncate flex-1" style={{ color }}>
           {def.label}
         </span>
-        {/* Output shape badge */}
         <span
-          className={`
-            ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded
-            ${hasError ? "bg-red-500/20 text-red-400" : "bg-white/5 text-neutral-400"}
-          `}
+          className={`text-[10px] font-mono px-2 py-0.5 rounded-md ${
+            hasError ? "bg-[var(--danger-muted)] text-[var(--danger)]" : "bg-[var(--surface-elevated)] text-[var(--foreground-muted)]"
+          }`}
+          title={getShapeLabelTooltip(result?.outputShape ?? null) || undefined}
         >
           {outLabel}
         </span>
       </div>
 
-      {/* ── Body ── */}
-      <div className="px-3 py-2 space-y-1">
+      {/* Body */}
+      <div className="px-4 pb-3 space-y-1">
         {summary && (
-          <p className="text-[10px] text-neutral-400 font-mono leading-relaxed truncate">
+          <p className="text-[11px] text-[var(--foreground-muted)] font-mono leading-relaxed truncate">
             {summary}
           </p>
         )}
         {hasError && (
-          <p className="text-[10px] text-red-400 leading-snug line-clamp-2">
+          <p className="text-[11px] text-[var(--danger)] leading-snug line-clamp-2">
             {result?.error}
           </p>
         )}
       </div>
 
-      {/* ── Input handles ── */}
-      {def.inputPorts.map((port, i) => (
-        <Handle
-          key={port.id}
-          id={port.id}
-          type="target"
-          position={Position.Left}
-          style={{
-            top: `${30 + i * 20}%`,
-            width: 10,
-            height: 10,
-            background: hasError ? "#ef4444" : color,
-            border: "2px solid #111827",
-          }}
-        />
-      ))}
+      {/* Input handles */}
+      {def.inputPorts.map((port, i) => {
+        const topPct = def.inputPorts.length === 1
+          ? 50
+          : 25 + (i / Math.max(def.inputPorts.length - 1, 1)) * 50;
+        return (
+          <Handle
+            key={port.id}
+            id={port.id}
+            type="target"
+            position={Position.Left}
+            className="!transition-all !duration-200"
+            style={{
+              top: `${topPct}%`,
+              width: 10,
+              height: 10,
+              background: hasError ? "var(--danger)" : "var(--block-surface)",
+              border: `2.5px solid ${hasError ? "var(--danger)" : color}`,
+              boxShadow: `0 0 0 2px var(--block-surface), 0 1px 3px rgba(0,0,0,0.1)`,
+            }}
+          />
+        );
+      })}
 
-      {/* ── Output handles ── */}
-      {def.outputPorts.map((port, i) => (
-        <Handle
-          key={port.id}
-          id={port.id}
-          type="source"
-          position={Position.Right}
-          style={{
-            top: `${30 + i * 20}%`,
-            width: 10,
-            height: 10,
-            background: hasError ? "#ef4444" : color,
-            border: "2px solid #111827",
-          }}
-        />
-      ))}
+      {/* Output handles */}
+      {def.outputPorts.map((port, i) => {
+        const topPct = def.outputPorts.length === 1
+          ? 50
+          : 25 + (i / Math.max(def.outputPorts.length - 1, 1)) * 50;
+        return (
+          <Handle
+            key={port.id}
+            id={port.id}
+            type="source"
+            position={Position.Right}
+            className="!transition-all !duration-200"
+            style={{
+              top: `${topPct}%`,
+              width: 10,
+              height: 10,
+              background: hasError ? "var(--danger)" : color,
+              border: `2.5px solid var(--block-surface)`,
+              boxShadow: `0 0 0 2px var(--block-surface), 0 1px 3px rgba(0,0,0,0.1)`,
+            }}
+          />
+        );
+      })}
     </div>
   );
 }

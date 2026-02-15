@@ -60,6 +60,7 @@ import { upsertPaperProgress } from "@/lib/supabase/paperProgress";
 import { insertChatMessage, getChatHistory } from "@/lib/supabase/userHistories";
 import { getApiBase } from "@/neuralcanvas/lib/trainingApi";
 import ReactMarkdown from "react-markdown";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   InputBlock,
   TextInputBlock,
@@ -89,15 +90,15 @@ import {
 // Task label shown on canvas for challenges; scales with zoom, coverable by other nodes
 const CHALLENGE_TASK_NODE_TYPE = "challengeTask";
 
-function ChallengeTaskNode({ data }: NodeProps<{ task?: string; isPaperLevel?: boolean }>) {
+function ChallengeTaskNode({ data }: NodeProps<Node<{ task?: string; isPaperLevel?: boolean }>>) {
   const task = data?.task?.trim();
   const isPaper = data?.isPaperLevel === true;
   if (!task) return null;
   return (
     <div
-      className="text-white font-medium select-none max-w-[320px] leading-snug"
+      className="text-[var(--foreground)] font-medium select-none max-w-[320px] leading-snug bg-[var(--surface)]/80 backdrop-blur-sm rounded-xl px-4 py-3 border border-[var(--border)] shadow-sm"
       style={{
-        fontSize: 11,
+        fontSize: 12,
         pointerEvents: "none",
         whiteSpace: isPaper ? "pre-line" : "normal",
       }}
@@ -105,11 +106,13 @@ function ChallengeTaskNode({ data }: NodeProps<{ task?: string; isPaperLevel?: b
     >
       {isPaper ? (
         <>
-          <span className="text-amber-400/90 font-semibold block mb-1">About this paper</span>
-          <span className="text-neutral-300 font-normal">{task}</span>
+          <span className="text-amber-600 font-semibold block mb-1">About this paper</span>
+          <span className="text-[var(--foreground-secondary)] font-normal">{task}</span>
         </>
       ) : (
-        <>Task: {task}</>
+        <>
+          <span className="text-[var(--accent)] font-semibold">Task:</span> {task}
+        </>
       )}
     </div>
   );
@@ -151,41 +154,43 @@ const defaultEdgeOptions = {
 // Initial demo nodes so the canvas isn't empty on first load
 // ---------------------------------------------------------------------------
 
+// Spacing chosen so connectors are visible: block width ~220px, gap between blocks ~120px
+const INITIAL_NODE_SPACING = 340;
 const INITIAL_NODES: Node[] = [
   {
     id: "input-1",
     type: "Input",
-    position: { x: 50, y: 200 },
+    position: { x: 60, y: 200 },
     data: { params: {} },
   },
   {
     id: "flatten-1",
     type: "Flatten",
-    position: { x: 300, y: 200 },
+    position: { x: 60 + INITIAL_NODE_SPACING, y: 200 },
     data: { params: {} },
   },
   {
     id: "linear-1",
     type: "Linear",
-    position: { x: 550, y: 200 },
+    position: { x: 60 + INITIAL_NODE_SPACING * 2, y: 200 },
     data: { params: { in_features: 784, out_features: 128 } },
   },
   {
     id: "activation-1",
     type: "Activation",
-    position: { x: 800, y: 200 },
+    position: { x: 60 + INITIAL_NODE_SPACING * 3, y: 200 },
     data: { params: { activation: "relu" } },
   },
   {
     id: "linear-2",
     type: "Linear",
-    position: { x: 1050, y: 200 },
+    position: { x: 60 + INITIAL_NODE_SPACING * 4, y: 200 },
     data: { params: { in_features: 128, out_features: 10 } },
   },
   {
     id: "output-1",
     type: "Output",
-    position: { x: 1300, y: 200 },
+    position: { x: 60 + INITIAL_NODE_SPACING * 5, y: 200 },
     data: { params: {} },
   },
 ];
@@ -643,21 +648,21 @@ function CanvasInner({
         proOptions={{ hideAttribution: true }}
         deleteKeyCode={null} // We handle delete ourselves.
       >
-        {/* Subtle dot grid background */}
+        {/* Light dot grid background */}
         <Background
           variant={BackgroundVariant.Dots}
-          gap={20}
+          gap={24}
           size={1}
-          color="#1f293766"
+          color="var(--border-strong)"
         />
         <Controls
-          className="!bg-neural-surface !border-neural-border !rounded-lg !shadow-xl [&>button]:!bg-neural-surface [&>button]:!border-neural-border [&>button]:!text-neutral-400 [&>button:hover]:!bg-neural-border"
+          className="!bg-[var(--surface)] !border-[var(--border)] !rounded-xl !shadow-md"
           showInteractive={false}
         />
         <MiniMap
           nodeColor={minimapNodeColor}
-          maskColor="rgba(11, 15, 26, 0.85)"
-          className="!bg-neural-surface !border-neural-border !rounded-lg !shadow-xl"
+          maskColor="var(--background)"
+          className="!bg-[var(--surface)] !border-[var(--border)] !rounded-xl !shadow-md"
           pannable
           zoomable
         />
@@ -665,6 +670,7 @@ function CanvasInner({
 
       {/* ── Top-right toolbar ── */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        <ThemeToggle />
         {challengeSolutionGraph && !isPaperLevel && (
           <SubmitChallengeButton
             onSubmit={handleSubmitChallenge}
@@ -705,20 +711,8 @@ function CanvasInner({
         )}
       </div>
 
-      {/* ── Bottom bar: keyboard hints + gradient flow toggle ── */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-1.5 rounded-full bg-neural-surface/80 border border-neural-border backdrop-blur text-[10px] font-mono select-none">
-        <span className="text-neutral-500 pointer-events-none">⌫ Delete</span>
-        <span className="text-neural-border pointer-events-none">|</span>
-        <span className="text-neutral-500 pointer-events-none">⌘Z Undo</span>
-        <span className="text-neural-border pointer-events-none">|</span>
-        <span className="text-neutral-500 pointer-events-none">⌘⇧Z Redo</span>
-        <span className="text-neural-border pointer-events-none">|</span>
-        <span className="text-neutral-500 pointer-events-none">⌘D Duplicate</span>
-        <span className="text-neural-border pointer-events-none">|</span>
-        <span className="text-neutral-500 pointer-events-none">Drag background to pan</span>
-        <span className="text-neural-border pointer-events-none">|</span>
-        <span className="text-neutral-500 pointer-events-none">Space: box select</span>
-        <span className="text-neural-border pointer-events-none">|</span>
+      {/* ── Bottom bar: gradient flow toggle (shortcuts removed for cleaner UI) ── */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
         <GradientFlowToggle nodeIds={nodes.map((n) => n.id)} />
       </div>
       </div>
@@ -778,14 +772,14 @@ function FeedbackButton({
         disabled={disabled}
         className={`
           flex items-center gap-2 px-3 py-1.5 rounded-full
-          border backdrop-blur text-[10px] font-mono font-semibold
-          transition-all duration-200 select-none
+          border text-[11px] font-medium
+          transition-all duration-200 select-none shadow-sm
           ${
             disabled
-              ? "bg-neural-surface/50 border-neural-border text-neutral-600 cursor-not-allowed"
+              ? "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-muted)] cursor-not-allowed opacity-70"
               : chatOpen
-                ? "bg-neural-accent/20 border-neural-accent/50 text-neural-accent-light"
-                : "bg-neural-surface/80 border-neural-border text-neutral-300 hover:text-white hover:border-neutral-500"
+                ? "bg-[var(--accent-muted)] border-[var(--accent)] text-[var(--accent)]"
+                : "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:border-[var(--border-strong)] hover:shadow-md"
           }
         `}
         title={disabled ? "Add blocks for feedback" : "Chat about your design"}
@@ -808,19 +802,19 @@ function FeedbackButton({
       {chatOpen && (
         <>
           <div
-            className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-40"
+            className="fixed inset-0 bg-black/10 backdrop-blur-[2px] z-40"
             onClick={onCloseChat}
             aria-hidden="true"
           />
           <div
-            className="fixed bottom-4 right-4 w-[360px] max-h-[480px] rounded-2xl bg-neural-surface/95 border border-neural-border/80 shadow-2xl backdrop-blur-xl z-50 flex flex-col overflow-hidden"
+            className="fixed bottom-4 right-4 w-[380px] max-h-[500px] rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-xl z-50 flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-neural-border/60 shrink-0">
-              <span className="text-sm font-semibold text-white font-mono">Design feedback</span>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] shrink-0">
+              <span className="text-sm font-semibold text-[var(--foreground)]">Design Feedback</span>
               <button
                 onClick={onCloseChat}
-                className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neural-border/50 transition-colors"
+                className="p-1.5 rounded-lg text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-colors"
                 aria-label="Close"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -832,21 +826,21 @@ function FeedbackButton({
               {messages.map((msg, i) =>
                 msg.role === "user" ? (
                   <div key={i} className="flex justify-end">
-                    <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-br-md bg-neural-accent/20 border border-neural-accent/30 text-xs text-neutral-200">
+                    <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-br-md bg-[var(--accent-muted)] border border-[var(--accent-strong)] text-xs text-[var(--foreground)]">
                       {msg.content}
                     </div>
                   </div>
                 ) : (
                   <div key={i} className="flex justify-start">
-                    <div className="max-w-[85%] px-3 py-2.5 rounded-2xl rounded-bl-md bg-neural-bg/80 border border-neural-border/50 text-xs text-neutral-300 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-1 [&_strong]:font-semibold [&_strong]:text-neutral-200 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:bg-white/10 [&_code]:text-[11px]">
+                    <div className="max-w-[85%] px-3 py-2.5 rounded-2xl rounded-bl-md bg-[var(--surface-elevated)] border border-[var(--border)] text-xs text-[var(--foreground-secondary)] leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-1 [&_strong]:font-semibold [&_strong]:text-[var(--foreground)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:bg-[var(--surface-hover)] [&_code]:text-[11px]">
                       <ReactMarkdown
                         components={{
                           p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                           ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 my-2">{children}</ul>,
                           ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1 my-2">{children}</ol>,
                           li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                          strong: ({ children }) => <strong className="font-semibold text-neutral-200">{children}</strong>,
-                          code: ({ children }) => <code className="px-1 py-0.5 rounded bg-white/10 text-[11px] font-mono">{children}</code>,
+                          strong: ({ children }) => <strong className="font-semibold text-[var(--foreground)]">{children}</strong>,
+                          code: ({ children }) => <code className="px-1 py-0.5 rounded bg-[var(--surface-hover)] text-[11px] font-mono">{children}</code>,
                         }}
                       >
                         {msg.content}
@@ -857,13 +851,13 @@ function FeedbackButton({
               )}
               {loading && (
                 <div className="flex justify-start">
-                  <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-md bg-neural-border/30 text-xs text-neutral-400 flex items-center gap-2">
+                  <div className="max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-md bg-[var(--surface-elevated)] text-xs text-[var(--foreground-muted)] flex items-center gap-2">
                     <span className="animate-pulse">Thinking...</span>
                   </div>
                 </div>
               )}
             </div>
-            <form onSubmit={handleSubmit} className="p-3 border-t border-neural-border/60 shrink-0">
+            <form onSubmit={handleSubmit} className="p-3 border-t border-[var(--border)] shrink-0">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -871,9 +865,9 @@ function FeedbackButton({
                 placeholder="Ask about your design..."
                 rows={1}
                 disabled={loading || disabled}
-                className="w-full px-3 py-2 rounded-xl bg-neural-bg border border-neural-border text-sm text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-neural-accent resize-none disabled:opacity-50"
+                className="w-full px-3 py-2 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] text-sm text-[var(--foreground)] placeholder-[var(--foreground-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-strong)] focus:border-[var(--accent)] resize-none disabled:opacity-50"
               />
-              <p className="mt-1 text-[10px] text-neutral-500 font-mono">Press Enter to send</p>
+              <p className="mt-1 text-[10px] text-[var(--foreground-muted)]">Press Enter to send</p>
             </form>
           </div>
         </>
@@ -905,16 +899,16 @@ function SubmitChallengeButton({
       disabled={disabled}
       className={`
         flex items-center gap-2 px-3 py-1.5 rounded-full
-        border backdrop-blur text-[10px] font-mono font-semibold
-        transition-all duration-200 select-none
+        border text-[11px] font-medium
+        transition-all duration-200 select-none shadow-sm
         ${
           result === "correct"
-            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+            ? "bg-[var(--success-muted)] border-[var(--success)] text-[var(--success)]"
             : result === "wrong"
-              ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
+              ? "bg-[var(--warning-muted)] border-[var(--warning)] text-[var(--warning)]"
               : disabled
-                ? "bg-neural-surface/50 border-neural-border text-neutral-600 cursor-not-allowed"
-                : "bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25 hover:border-amber-500/50"
+                ? "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-muted)] cursor-not-allowed opacity-70"
+                : "bg-[var(--warning-muted)] border-[var(--warning)] text-[var(--warning)] hover:opacity-80 hover:shadow-md"
         }
       `}
       title={disabled ? "Add blocks to submit" : "Check if your graph matches the solution"}
@@ -952,16 +946,16 @@ function SaveButton({
       disabled={disabled || status === "saving"}
       className={`
         flex items-center gap-2 px-3 py-1.5 rounded-full
-        border backdrop-blur text-[10px] font-mono font-semibold
-        transition-all duration-200 select-none
+        border text-[11px] font-medium
+        transition-all duration-200 select-none shadow-sm
         ${
           status === "saved"
-            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+            ? "bg-[var(--success-muted)] border-[var(--success)] text-[var(--success)]"
             : status === "error"
-              ? "bg-red-500/10 border-red-500/30 text-red-400"
+              ? "bg-[var(--danger-muted)] border-[var(--danger)] text-[var(--danger)]"
               : disabled || status === "saving"
-                ? "bg-neural-surface/50 border-neural-border text-neutral-600 cursor-not-allowed"
-                : "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30 hover:border-emerald-500/60"
+                ? "bg-[var(--surface)]/80 border-[var(--border)] text-[var(--foreground-muted)] cursor-not-allowed"
+                : "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:border-[var(--border-strong)] hover:shadow-md"
         }
       `}
       title={disabled ? "Add blocks to save" : "Save to Supabase"}
@@ -998,12 +992,12 @@ function TrainingToggle({
       onClick={onToggle}
       className={`
         flex items-center gap-2 px-3 py-1.5 rounded-full
-        border backdrop-blur text-[10px] font-mono font-semibold
-        transition-all duration-200 select-none
+        border text-[11px] font-medium
+        transition-all duration-200 select-none shadow-sm
         ${
           open
-            ? "bg-neural-accent/20 border-neural-accent/50 text-neural-accent-light shadow-[0_0_20px_rgba(139,92,246,0.15)]"
-            : "bg-neural-surface/80 border-neural-border text-neutral-500 hover:text-neutral-300 hover:border-neutral-600"
+            ? "bg-[var(--accent-muted)] border-[var(--accent)] text-[var(--accent)]"
+            : "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:border-[var(--border-strong)] hover:shadow-md"
         }
       `}
       title={open ? "Close training panel" : "Open training panel"}
@@ -1044,13 +1038,13 @@ function GradientFlowToggle({ nodeIds }: { nodeIds: string[] }) {
     <button
       onClick={handleToggle}
       className={`
-        flex items-center gap-2 px-2.5 py-1 rounded-full
-        border backdrop-blur text-[10px] font-mono font-semibold
-        transition-all duration-200 select-none
+        flex items-center gap-2 px-3 py-1.5 rounded-full
+        border text-[11px] font-medium
+        transition-all duration-200 select-none shadow-sm
         ${
           enabled
-            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_20px_rgba(34,197,94,0.15)]"
-            : "bg-neural-surface/80 border-neural-border text-neutral-500 hover:text-neutral-300 hover:border-neutral-600"
+            ? "bg-[var(--success-muted)] border-[var(--success)] text-[var(--success)]"
+            : "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--foreground-secondary)] hover:border-[var(--border-strong)] hover:shadow-md"
         }
       `}
       title={enabled ? "Hide gradient flow overlay" : "Show gradient flow overlay on canvas"}
