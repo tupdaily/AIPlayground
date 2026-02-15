@@ -1,6 +1,14 @@
 """AIPlayground Backend - FastAPI server for visual ML model building."""
 
 import os
+# Set SSL certs before any imports that might download (e.g. torchvision datasets)
+try:
+    import certifi
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+except ImportError:
+    pass
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import feedback, graphs, datasets, training, models

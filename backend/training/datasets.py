@@ -5,13 +5,38 @@ from __future__ import annotations
 import csv
 import io
 import os
+import random
 import tempfile
 import zipfile
 
+import numpy as np
 import torch
+from PIL import Image
 from torch.utils.data import DataLoader, Dataset, random_split
 import torchvision
 import torchvision.transforms as transforms
+from torchvision.transforms import v2 as T
+
+# Use certifi's CA bundle so dataset downloads work when system SSL is missing (e.g. some macOS Python builds)
+try:
+    import certifi
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+except ImportError:
+    pass
+
+# Data root for built-in datasets; create so downloads never fail on path
+DATA_ROOT = os.path.abspath(os.environ.get("DATASET_DATA_DIR", os.path.join(os.path.dirname(__file__), "..", "data")))
+
+
+class AddGaussianNoise:
+    """Add Gaussian noise to a tensor (for augmentation). Expects tensor in [0, 1]."""
+
+    def __init__(self, amount: float = 0.08):
+        self.amount = amount
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        return (x + self.amount * torch.randn_like(x)).clamp(0.0, 1.0)
 
 
 BUILTIN_DATASETS = {
@@ -65,33 +90,140 @@ def get_dataset_shape(dataset_id: str) -> tuple[int, ...]:
     return info["input_shape"]
 
 
-def load_dataset(dataset_id: str) -> torchvision.datasets.VisionDataset:
-    """Load a built-in dataset."""
-    transform = transforms.Compose([transforms.ToTensor()])
+def _build_augment_transforms(augment_list: list[dict] | None) -> list:
+    """Build a list of torchvision transforms from frontend augment config."""
+    if not augment_list:
+        return []
+    out: list = []
+    for a in augment_list:
+        if not isinstance(a, dict) or a.get("enabled") is False:
+            continue
+        aid = a.get("id")
+        params = a.get("params") or {}
+        if aid == "rotation":
+            deg = float(params.get("degrees", 15))
+            out.append(T.RandomRotation(degrees=(-deg, deg)))
+        elif aid == "hflip":
+            out.append(T.RandomHorizontalFlip(p=0.5))
+        elif aid == "vflip":
+            out.append(T.RandomVerticalFlip(p=0.5))
+        elif aid == "brightness":
+            factor = float(params.get("factor", 0.2))
+            out.append(T.ColorJitter(brightness=(1 - factor, 1 + factor)))
+        elif aid == "contrast":
+            factor = float(params.get("factor", 0.2))
+            out.append(T.ColorJitter(contrast=(1 - factor, 1 + factor)))
+        elif aid == "saturation":
+            factor = float(params.get("factor", 0.3))
+            out.append(T.ColorJitter(saturation=(1 - factor, 1 + factor)))
+        elif aid == "noise":
+            amount = float(params.get("amount", 0.08))
+            out.append(AddGaussianNoise(amount=amount))
+        elif aid == "blur":
+            radius = float(params.get("radius", 1))
+            k = max(3, min(15, int(2 * radius + 1) | 1))  # odd 3–15
+            sigma = (radius * 0.5, radius * 1.0)
+            out.append(T.GaussianBlur(kernel_size=(k, k), sigma=sigma))
+    return out
 
+
+# In-memory cache so we load each dataset once (from disk/cloud) and serve random samples from it.
+_dataset_sample_cache: dict[str, torchvision.datasets.VisionDataset] = {}
+
+
+def generate_random_sample_png(dataset_id: str) -> bytes:
+    """Generate one random image with the correct shape for the dataset (no download, no disk).
+    Always works for mnist, fashion_mnist, cifar10. Used for augment preview so the UI always shows an image."""
+    info = BUILTIN_DATASETS.get(dataset_id)
+    if not info:
+        raise ValueError(f"Unknown dataset: {dataset_id}")
+    shape = info["input_shape"]  # (C, H, W)
+    # Random image in [0, 1] with same shape as the dataset
+    img_tensor = torch.rand(shape)
+    return _tensor_to_png_bytes(img_tensor)
+
+
+def _tensor_to_png_bytes(img_tensor: torch.Tensor) -> bytes:
+    """Convert a CxHxW tensor in [0, 1] to PNG bytes. Works for 1-channel (MNIST, Fashion-MNIST) and 3-channel (CIFAR-10)."""
+    x = img_tensor.cpu().clamp(0.0, 1.0)
+    if x.dim() == 2:
+        x = x.unsqueeze(0)
+    arr = (x.numpy() * 255).astype(np.uint8)
+    if arr.shape[0] == 1:
+        pil = Image.fromarray(arr[0], mode="L")
+    else:
+        pil = Image.fromarray(np.transpose(arr, (1, 2, 0)), mode="RGB")
+    buf = io.BytesIO()
+    pil.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def get_dataset_sample_png(dataset_id: str, index: int | None = None) -> bytes:
+    """Load one random image from the dataset (MNIST, Fashion-MNIST, or CIFAR-10) and return as PNG bytes.
+    Datasets are loaded via torchvision (from disk or cloud download) and cached for fast subsequent samples."""
+    if dataset_id not in _dataset_sample_cache:
+        _dataset_sample_cache[dataset_id] = load_dataset(dataset_id)
+    dataset = _dataset_sample_cache[dataset_id]
+    n = len(dataset)
+    if n == 0:
+        raise ValueError("Dataset is empty")
+    if index is None:
+        index = random.randint(0, n - 1)
+    else:
+        index = max(0, min(index, n - 1))
+    img_tensor, _ = dataset[index]
+    if img_tensor.dim() == 2:
+        img_tensor = img_tensor.unsqueeze(0)
+    return _tensor_to_png_bytes(img_tensor)
+
+
+def load_dataset(dataset_id: str) -> torchvision.datasets.VisionDataset:
+    """Load a built-in dataset with ToTensor only (augmentations applied in get_dataloaders)."""
+    os.makedirs(DATA_ROOT, exist_ok=True)
+    transform = transforms.Compose([transforms.ToTensor()])
     match dataset_id:
         case "mnist":
             return torchvision.datasets.MNIST(
-                "./data", train=True, download=True, transform=transform
+                DATA_ROOT, train=True, download=True, transform=transform
             )
         case "fashion_mnist":
             return torchvision.datasets.FashionMNIST(
-                "./data", train=True, download=True, transform=transform
+                DATA_ROOT, train=True, download=True, transform=transform
             )
         case "cifar10":
             return torchvision.datasets.CIFAR10(
-                "./data", train=True, download=True, transform=transform
+                DATA_ROOT, train=True, download=True, transform=transform
             )
         case _:
             raise ValueError(f"Unknown dataset: {dataset_id}")
+
+
+class _TransformSubset(Dataset):
+    """Wraps a subset and applies an extra transform to (image, target) -> (transform(image), target)."""
+
+    def __init__(self, subset: torch.utils.data.Subset, transform):
+        self.subset = subset
+        self.transform = transform
+
+    def __len__(self) -> int:
+        return len(self.subset)
+
+    def __getitem__(self, idx: int):
+        x, y = self.subset[idx]
+        return self.transform(x), y
 
 
 def get_dataloaders(
     dataset_id: str,
     batch_size: int = 64,
     train_split: float = 0.8,
+    augment_config: list[dict] | None = None,
 ) -> tuple[DataLoader, DataLoader]:
-    """Load dataset and split into train/validation DataLoaders."""
+    """Load dataset and split into train/validation DataLoaders.
+    Data source is always the dataset_id (from the Input block). augment_config, when
+    provided (from an Augment block connected to Input), applies image transforms to the
+    training split only; used for image datasets (e.g. mnist, fashion_mnist, cifar10).
+    """
     if dataset_id.startswith("custom:"):
         return _get_custom_dataloaders(dataset_id, batch_size, train_split)
 
@@ -100,11 +232,19 @@ def get_dataloaders(
     train_size = int(len(dataset) * train_split)
     val_size = len(dataset) - train_size
 
-    train_dataset, val_dataset = random_split(
+    train_subset, val_dataset = random_split(
         dataset,
         [train_size, val_size],
         generator=torch.Generator().manual_seed(42),
     )
+
+    augment_transforms = _build_augment_transforms(augment_config)
+    if augment_transforms:
+        train_dataset = _TransformSubset(
+            train_subset, transforms.Compose([*augment_transforms])
+        )
+    else:
+        train_dataset = train_subset
 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True, num_workers=0
