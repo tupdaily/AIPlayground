@@ -187,9 +187,18 @@ async def delete_dataset(
     return {"status": "deleted"}
 
 
+# ---------------------------------------------------------------------------
+# Sample image for Augment block preview (eye button in the UI)
+# ---------------------------------------------------------------------------
 @router.get("/{dataset_id}/sample")
 async def get_dataset_sample(dataset_id: str):
-    """Return one random sample image from the dataset as PNG (for augment preview). Works for MNIST, Fashion-MNIST, and CIFAR-10."""
+    """Return one random sample image from a built-in dataset as PNG.
+
+    Used by the Augment block's preview modal so the user sees a real (or
+    fallback) image for the selected dataset (mnist, fashion_mnist, cifar10).
+    Custom datasets are not supported; returns 404 for __custom__ or unknown id.
+    On download failure (e.g. SSL), we fall back to a generated random image.
+    """
     if not dataset_id or dataset_id.strip().lower() == "__custom__":
         raise HTTPException(status_code=404, detail="No sample for custom dataset")
     key = dataset_id.strip().lower()

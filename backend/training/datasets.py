@@ -17,7 +17,11 @@ import torchvision
 import torchvision.transforms as transforms
 from torchvision.transforms import v2 as T
 
-# Use certifi's CA bundle so dataset downloads work when system SSL is missing (e.g. some macOS Python builds)
+# ---------------------------------------------------------------------------
+# SSL: use certifi's CA bundle so torchvision dataset downloads work when the
+# system trust store is missing (e.g. some macOS Python installs). Without this,
+# MNIST/CIFAR-10 downloads can fail with CERTIFICATE_VERIFY_FAILED.
+# ---------------------------------------------------------------------------
 try:
     import certifi
     os.environ.setdefault("SSL_CERT_FILE", certifi.where())
@@ -25,10 +29,16 @@ try:
 except ImportError:
     pass
 
-# Data root for built-in datasets; create so downloads never fail on path
+# Root directory for built-in dataset files (MNIST, Fashion-MNIST, CIFAR-10).
+# Override with DATASET_DATA_DIR env var. We create this dir before load so
+# downloads never fail due to a missing path.
 DATA_ROOT = os.path.abspath(os.environ.get("DATASET_DATA_DIR", os.path.join(os.path.dirname(__file__), "..", "data")))
 
 
+# ---------------------------------------------------------------------------
+# Augmentation: Gaussian noise transform used when the user enables "noise" in
+# the Augment block. Applied to the training split only (see get_dataloaders).
+# ---------------------------------------------------------------------------
 class AddGaussianNoise:
     """Add Gaussian noise to a tensor (for augmentation). Expects tensor in [0, 1]."""
 
@@ -39,6 +49,8 @@ class AddGaussianNoise:
         return (x + self.amount * torch.randn_like(x)).clamp(0.0, 1.0)
 
 
+# Built-in image datasets (torchvision). Custom datasets use the "custom:" prefix
+# and are registered via register_custom_dataset before training.
 BUILTIN_DATASETS = {
     "mnist": {
         "name": "MNIST",
@@ -91,7 +103,12 @@ def get_dataset_shape(dataset_id: str) -> tuple[int, ...]:
 
 
 def _build_augment_transforms(augment_list: list[dict] | None) -> list:
-    """Build a list of torchvision transforms from frontend augment config."""
+    """Build a list of torchvision transforms from the Augment block's config.
+
+    The frontend sends a list of { id, enabled, params } (e.g. rotation, hflip,
+    noise). We only add transforms for enabled entries. Used in get_dataloaders
+    to augment the training split (validation data is left unaugmented).
+    """
     if not augment_list:
         return []
     out: list = []
@@ -127,13 +144,21 @@ def _build_augment_transforms(augment_list: list[dict] | None) -> list:
     return out
 
 
-# In-memory cache so we load each dataset once (from disk/cloud) and serve random samples from it.
+# ---------------------------------------------------------------------------
+# Sample image API (for Augment block preview in the UI)
+# ---------------------------------------------------------------------------
+# Cache loaded datasets so we don't re-download on every sample request.
+# Key: dataset_id (mnist, fashion_mnist, cifar10). Value: torchvision VisionDataset.
 _dataset_sample_cache: dict[str, torchvision.datasets.VisionDataset] = {}
 
 
 def generate_random_sample_png(dataset_id: str) -> bytes:
-    """Generate one random image with the correct shape for the dataset (no download, no disk).
-    Always works for mnist, fashion_mnist, cifar10. Used for augment preview so the UI always shows an image."""
+    """Generate one random image with the correct shape for the dataset (no download).
+
+    Used as a fallback when get_dataset_sample_png fails (e.g. SSL or network).
+    Returns PNG bytes with the same dimensions as the dataset so the Augment
+    preview always shows something for mnist, fashion_mnist, cifar10.
+    """
     info = BUILTIN_DATASETS.get(dataset_id)
     if not info:
         raise ValueError(f"Unknown dataset: {dataset_id}")
@@ -144,7 +169,11 @@ def generate_random_sample_png(dataset_id: str) -> bytes:
 
 
 def _tensor_to_png_bytes(img_tensor: torch.Tensor) -> bytes:
-    """Convert a CxHxW tensor in [0, 1] to PNG bytes. Works for 1-channel (MNIST, Fashion-MNIST) and 3-channel (CIFAR-10)."""
+    """Convert a CxHxW tensor in [0, 1] to PNG bytes.
+
+    Handles 1-channel (MNIST, Fashion-MNIST) and 3-channel (CIFAR-10) using
+    numpy + PIL so all three datasets render correctly in the browser.
+    """
     x = img_tensor.cpu().clamp(0.0, 1.0)
     if x.dim() == 2:
         x = x.unsqueeze(0)
@@ -159,8 +188,13 @@ def _tensor_to_png_bytes(img_tensor: torch.Tensor) -> bytes:
 
 
 def get_dataset_sample_png(dataset_id: str, index: int | None = None) -> bytes:
-    """Load one random image from the dataset (MNIST, Fashion-MNIST, or CIFAR-10) and return as PNG bytes.
-    Datasets are loaded via torchvision (from disk or cloud download) and cached for fast subsequent samples."""
+    """Load one image from the built-in dataset and return as PNG bytes.
+
+    Used by GET /api/datasets/{id}/sample for the Augment block's live preview.
+    Uses a random index when index is None. Datasets are cached in memory after
+    first load so repeated requests are fast. Raises on failure; the router
+    falls back to generate_random_sample_png when this raises.
+    """
     if dataset_id not in _dataset_sample_cache:
         _dataset_sample_cache[dataset_id] = load_dataset(dataset_id)
     dataset = _dataset_sample_cache[dataset_id]
@@ -178,7 +212,11 @@ def get_dataset_sample_png(dataset_id: str, index: int | None = None) -> bytes:
 
 
 def load_dataset(dataset_id: str) -> torchvision.datasets.VisionDataset:
-    """Load a built-in dataset with ToTensor only (augmentations applied in get_dataloaders)."""
+    """Load a built-in dataset with ToTensor only.
+
+    Augmentations (from the Augment block) are applied in get_dataloaders, not here.
+    Creates DATA_ROOT if needed so the first download never fails on path.
+    """
     os.makedirs(DATA_ROOT, exist_ok=True)
     transform = transforms.Compose([transforms.ToTensor()])
     match dataset_id:
@@ -238,6 +276,7 @@ def get_dataloaders(
         generator=torch.Generator().manual_seed(42),
     )
 
+    # Apply Augment block config (rotation, flip, noise, etc.) to training data only.
     augment_transforms = _build_augment_transforms(augment_config)
     if augment_transforms:
         train_dataset = _TransformSubset(

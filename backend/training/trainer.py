@@ -37,8 +37,9 @@ async def train_model(
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = model.to(device)
 
-        # Augment: only when Input -> Augment and dataset is image-based (same data Input gives).
-        # Augment never fetches its own data; it only transforms the training split of the Input dataset.
+        # Read Augment block config from the graph: when Input -> Augment and the
+        # dataset is image-based, we pass augmentations (rotation, flip, noise, etc.)
+        # to get_dataloaders so the training split is augmented; validation is not.
         IMAGE_DATASETS = {"mnist", "fashion_mnist", "cifar10"}
         augment_config = None
         if dataset_id.lower() in IMAGE_DATASETS:

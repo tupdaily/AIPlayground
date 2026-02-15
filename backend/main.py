@@ -1,7 +1,10 @@
 """AIPlayground Backend - FastAPI server for visual ML model building."""
 
 import os
-# Set SSL certs before any imports that might download (e.g. torchvision datasets)
+
+# Set SSL certs before any imports that trigger downloads (e.g. torchvision
+# datasets). Ensures MNIST/CIFAR-10 etc. can download on systems where Python
+# doesn't use the system CA bundle (e.g. some macOS installs).
 try:
     import certifi
     os.environ.setdefault("SSL_CERT_FILE", certifi.where())
