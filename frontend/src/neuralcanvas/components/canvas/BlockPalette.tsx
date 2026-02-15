@@ -40,6 +40,7 @@ import {
   Layers,
   Wrench,
   Star,
+  Minimize2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -63,6 +64,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   hash: Hash,
   "map-pin": MapPin,
   percent: Percent,
+  "minimize-2": Minimize2,
 };
 
 const CATEGORIES: {
@@ -97,6 +99,8 @@ const FRIENDLY_DESCRIPTIONS: Record<string, string> = {
   Output: "Where predictions come out",
   Linear: "Connects neurons — the core building block",
   Conv2D: "Finds patterns in images like edges and shapes",
+  MaxPool2D: "Shrinks image size by taking the max in 2D windows",
+  MaxPool1D: "Shrinks sequence length by taking the max in 1D windows",
   LSTM: "Remembers patterns over time in sequences",
   Attention: "Lets the model focus on what matters most",
   Activation: "Adds non-linearity so the model can learn",
