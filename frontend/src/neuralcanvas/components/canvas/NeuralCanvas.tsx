@@ -250,6 +250,7 @@ function CanvasInner({
   isPaperLevel,
   paperLevelNumber,
   paperStepIndex,
+  paperFocusedNodeId,
 }: {
   initialNodes?: Node[];
   initialEdges?: Edge[];
@@ -262,6 +263,7 @@ function CanvasInner({
   isPaperLevel?: boolean;
   paperLevelNumber?: number | null;
   paperStepIndex?: number | null;
+  paperFocusedNodeId?: string | null;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes ?? INITIAL_NODES);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges ?? INITIAL_EDGES);
@@ -861,6 +863,20 @@ function CanvasInner({
     ? { padding: 0.65, minZoom: 0.2, maxZoom: 0.85 }
     : { padding: 0.3 };
 
+  // When stepping through MC, zoom fit around the focused layer
+  useEffect(() => {
+    if (!isPaperLevel || !paperFocusedNodeId) return;
+    const opts = { padding: 0.65, minZoom: 0.2, maxZoom: 0.85, duration: 150 };
+    const t = setTimeout(() => {
+      try {
+        reactFlowInstance.fitView({ ...opts, nodes: [{ id: paperFocusedNodeId }] });
+      } catch {
+        reactFlowInstance.fitView(opts);
+      }
+    }, 120);
+    return () => clearTimeout(t);
+  }, [isPaperLevel, paperFocusedNodeId, reactFlowInstance]);
+
   return (
     <SuggestionContext.Provider value={suggestionContextValue}>
     <div className="flex w-full h-full">
@@ -920,7 +936,12 @@ function CanvasInner({
           onInit={isPaperLevel
             ? (instance) => {
                 window.setTimeout(() => {
-                  instance.fitView({ padding: 0.65, minZoom: 0.2, maxZoom: 0.85, duration: 150 });
+                  const opts = { padding: 0.65, minZoom: 0.2, maxZoom: 0.85, duration: 150 };
+                  if (paperFocusedNodeId) {
+                    instance.fitView({ ...opts, nodes: [{ id: paperFocusedNodeId }] });
+                  } else {
+                    instance.fitView(opts);
+                  }
                 }, 80);
               }
             : undefined}
@@ -1438,6 +1459,8 @@ export interface NeuralCanvasProps {
   /** When on a paper walkthrough, Save persists this level number and step index. */
   paperLevelNumber?: number | null;
   paperStepIndex?: number | null;
+  /** When set, fitView on init centers on this node (for walkthrough zoom on focused layer). */
+  paperFocusedNodeId?: string | null;
 }
 
 export default function NeuralCanvas({
@@ -1452,6 +1475,7 @@ export default function NeuralCanvas({
   onChallengeSuccess,
   paperLevelNumber = null,
   paperStepIndex = null,
+  paperFocusedNodeId = null,
 }: NeuralCanvasProps = {}) {
   const effectiveInitialNodes = useMemo(() => {
     const base = initialNodes ?? INITIAL_NODES;
@@ -1488,6 +1512,7 @@ export default function NeuralCanvas({
                 isPaperLevel={isPaperLevel}
                 paperLevelNumber={paperLevelNumber ?? undefined}
                 paperStepIndex={paperStepIndex ?? undefined}
+                paperFocusedNodeId={paperFocusedNodeId ?? undefined}
               />
             </div>
             </GradientFlowProvider>

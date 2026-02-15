@@ -12,6 +12,8 @@ export interface LevelRow {
   solution_graph_json: GraphSchema | null;
   /** Display section: 'challenges' (guided exercises) or 'papers' (paper-based design tasks). Omit for legacy rows. */
   section?: "challenges" | "papers";
+  /** Category for papers only: 'vision', 'language', etc. Used to group papers in the UI. */
+  paper_category?: string | null;
   created_at: string;
   updated_at: string;
 }

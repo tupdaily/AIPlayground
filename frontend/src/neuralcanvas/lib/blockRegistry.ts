@@ -375,7 +375,7 @@ const ACTIVATION_BLOCK: BlockDefinition = {
   inputPorts: [{ id: "in", label: "Input" }],
   outputPorts: [{ id: "out", label: "Output" }],
   color: CATEGORY_COLORS.activation,
-  description: "Applies a non-linear activation function element-wise.",
+  description: "Applies a non-linear activation element-wise. Options: ReLU, GELU (common in BERT/GPT and other LLMs), sigmoid, tanh.",
 };
 
 const DROPOUT_BLOCK: BlockDefinition = {
