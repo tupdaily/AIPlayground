@@ -241,7 +241,7 @@ class DynamicModel(nn.Module):
                 if inp.dim() == 3:
                     b, seq_len, d = inp.shape
                     inp = inp.reshape(-1, d)
-                    out = self.layers[node_id](inp)
+                    out = self.layers[node_id](inp.reshape((1, 28, 28)))
                     outputs[node_id] = out.reshape(b, seq_len, -1)
                 else:
                     if inp.dim() > 2:

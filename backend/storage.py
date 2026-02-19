@@ -39,7 +39,7 @@ def generate_signed_url(gcs_path: str, expiration_hours: int = 1) -> str:
         service_account_email = credentials.service_account_email
     else:
         # For OAuth/user credentials, fall back to the default compute SA
-        service_account_email = f"{project}@aiplayground-treehacks.iam.gserviceaccount.com"
+        service_account_email = settings.gcs_signing_service_account
 
     bucket = get_bucket()
     blob = bucket.blob(gcs_path)
